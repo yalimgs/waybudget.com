@@ -2,10 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WayBudget - Coming Soon</title>
+    <title>WayBudget - Plan Your Trip</title>
 </head>
 <body>
-    <h1>WayBudget is coming!</h1>
-    <p>Smart travel budget planning is being built.</p>
+    <h1>Welcome to WayBudget</h1>
+    <p>Please enter your travel details:</p>
+
+    <form id="tripForm">
+        <label for="destination">Destination (City):</label>
+        <input type="text" id="destination" name="destination" placeholder="Enter city" required>
+        <br><br>
+
+        <label for="date">Travel Date:</label>
+        <input type="date" id="date" name="date" required>
+        <br><br>
+
+        <button type="button" onclick="submitTrip()">Plan My Budget</button>
+    </form>
+
+    <script>
+        function submitTrip() {
+            const dest = document.getElementById('destination').value;
+            const date = document.getElementById('date').value;
+            const today = new Date().toISOString().split('T')[0];
+
+            if (date < today) {
+                alert("Please select today or a future date.");
+            } else {
+                alert("Planning your budget for " + dest + " on " + date);
+                // Burada ileride AI server'ına bağlanacağız
+            }
+        }
+    </script>
 </body>
 </html>
