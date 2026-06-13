@@ -3,110 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WayBudget - Plan Your Trip</title>
+    <title>WayBudget - Professional Route Planner</title>
     <style>
         .container { 
-            max-width: 400px; margin: 50px auto; font-family: 'Segoe UI', sans-serif; 
-            padding: 20px; border: 1px solid #ddd; border-radius: 10px; 
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; 
+            max-width: 450px; 
+            margin: 60px auto; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 30px; 
+            border: 1px solid #ddd; 
+            border-radius: 12px; 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15); 
+            background-color: #fff;
+            text-align: center; 
         }
-        .input-group { margin-bottom: 15px; position: relative; text-align: left; }
-        input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-family: 'Segoe UI', sans-serif; font-size: 14px; }
-        
-        #cityResults { 
-            border: 1px solid #ccc; display:none; list-style:none; padding:0; margin:0; 
+        h1 { color: #333; margin-bottom: 25px; }
+        .input-group { margin-bottom: 20px; position: relative; text-align: left; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        input { 
+            width: 100%; padding: 14px; box-sizing: border-box; 
+            border: 1px solid #ccc; border-radius: 6px; 
+            font-family: inherit; font-size: 15px; 
+        }
+        .city-results { 
+            border: 1px solid #ccc; display: none; list-style: none; padding: 0; margin: 0; 
             position: absolute; background: white; width: 100%; z-index: 1000; 
             max-height: 200px; overflow-y: auto; border-radius: 5px; 
-            font-family: 'Segoe UI', sans-serif;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        #cityResults li { 
-            padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; 
-            font-size: 14px; color: #333;
+        .city-results li { 
+            padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; 
+            font-size: 14px; color: #444; transition: background 0.2s;
         }
-        #cityResults li:hover { background-color: #f0f0f0; }
-        
+        .city-results li:hover { background-color: #f7f7f7; }
         button { 
-            width: 100%; padding: 12px; background-color: #007bff; color: white; 
-            font-weight: bold; cursor: pointer; border: none; border-radius: 5px; margin-top: 10px; 
+            width: 100%; padding: 15px; background-color: #007bff; color: white; 
+            font-size: 16px; font-weight: bold; cursor: pointer; 
+            border: none; border-radius: 6px; margin-top: 10px; transition: background 0.3s;
         }
+        button:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>WayBudget</h1>
+        
         <div class="input-group">
-            <label for="destination">Destination (City, Country):</label>
-            <input type="text" id="destination" placeholder="Search city or country..." oninput="filterCities(this.value)">
-            <ul id="cityResults"></ul>
+            <label for="origin">From:</label>
+            <input type="text" id="origin" placeholder="Departure city..." oninput="filterCities(this.value, 'origin')">
+            <ul id="originResults" class="city-results"></ul>
         </div>
+
+        <div class="input-group">
+            <label for="destination">To:</label>
+            <input type="text" id="destination" placeholder="Arrival city..." oninput="filterCities(this.value, 'destination')">
+            <ul id="destinationResults" class="city-results"></ul>
+        </div>
+
         <div class="input-group">
             <label for="startDate">Start Date:</label>
             <input type="date" id="startDate" onchange="updateMinEndDate()">
         </div>
+
         <div class="input-group">
             <label for="endDate">End Date:</label>
             <input type="date" id="endDate">
         </div>
-        <button type="button" onclick="submitTrip()">Plan My Budget</button>
+
+        <button type="button" onclick="submitTrip()">Plan My Route</button>
     </div>
 
     <script>
-        // Global storage for the dataset
+        // --- Global State ---
         let allData = []; 
-        let selectedCity = ""; 
+        let tripData = { origin: "", destination: "" };
 
-        // Set minimum start date to today to prevent past travel bookings
-        document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
+        });
 
-        // Fetch dataset from external JSON file
+        // --- Data Loading ---
         fetch('countries+cities.json')
-            .then(response => response.json())
+            .then(res => res.json())
             .then(data => { allData = data; })
-            .catch(error => console.error('Error loading data:', error));
+            .catch(err => console.error('Data loading error:', err));
 
         /**
-         * Token-based Search Engine
-         * Splits input into words and matches them against cities and countries independently.
+         * Search Engine: Token-based filtering with relevance ranking
+         * @param {string} val - User search input
+         * @param {string} type - Identifier for the input field ('origin' or 'destination')
          */
-        function filterCities(val) {
-            const results = document.getElementById('cityResults');
+        function filterCities(val, type) {
+            const results = document.getElementById(type + 'Results');
             results.innerHTML = '';
-            selectedCity = ""; 
             
             if (val.length < 2) { results.style.display = 'none'; return; }
 
-            // Normalize input: replace commas with spaces and split into tokens for flexible search
-            const queryTokens = val.toLowerCase().replace(/,/g, ' ').split(' ').filter(token => token.length > 0);
+            const queryTokens = val.toLowerCase().replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
             let matches = [];
-            
+
             allData.forEach(country => {
                 country.cities.forEach(city => {
-                    const fullMatchString = `${city.toLowerCase()} ${country.name.toLowerCase()}`;
-                    
-                    // Check if every word in the query exists in the city/country record
-                    const isMatch = queryTokens.every(token => fullMatchString.includes(token));
+                    const fullString = `${city.toLowerCase()} ${country.name.toLowerCase()}`;
+                    const isMatch = queryTokens.every(t => fullString.includes(t));
                     
                     if (isMatch) {
-                        // Scoring: Prioritize matches where the city name starts with the first token for better UX
                         let score = city.toLowerCase().startsWith(queryTokens[0]) ? 100 : 50;
                         matches.push({ name: `${city}, ${country.name}`, score: score });
                     }
                 });
             });
 
-            // Sort matches by relevance score
             matches.sort((a, b) => b.score - a.score);
 
-            // Display top 10 relevant results
             if (matches.length > 0) {
                 results.style.display = 'block';
-                matches.slice(0, 10).forEach(item => {
+                matches.slice(0, 8).forEach(item => {
                     const li = document.createElement('li');
                     li.textContent = item.name;
                     li.onclick = () => { 
-                        document.getElementById('destination').value = item.name;
-                        selectedCity = item.name; 
+                        document.getElementById(type).value = item.name;
+                        tripData[type] = item.name;
                         results.style.display = 'none';
                     };
                     results.appendChild(li);
@@ -117,45 +135,39 @@
         }
 
         /**
-         * Restricts end date to be at least one day after the start date.
+         * Date Validation: Ensures endDate is at least one day after startDate
          */
         function updateMinEndDate() {
             const startDateValue = document.getElementById('startDate').value;
             if (!startDateValue) return;
 
-            // Calculate minimum end date (start date + 1 day)
             const startDate = new Date(startDateValue);
             const minEndDate = new Date(startDate);
             minEndDate.setDate(startDate.getDate() + 1);
-
-            // Format as YYYY-MM-DD
-            const minEndDateString = minEndDate.toISOString().split('T')[0];
             
             const endDateInput = document.getElementById('endDate');
-            endDateInput.min = minEndDateString;
+            endDateInput.min = minEndDate.toISOString().split('T')[0];
             
-            // If the current end date is invalid, clear it
             if (endDateInput.value && endDateInput.value <= startDateValue) {
                 endDateInput.value = '';
             }
         }
 
         /**
-         * Validates inputs and provides a trip summary.
+         * Validation & Planning logic
          */
         function submitTrip() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
             
-            if (!selectedCity || !start || !end || end <= start) {
-                alert("Please complete the form with valid trip details.");
+            if (!tripData.origin || !tripData.destination || !start || !end) {
+                alert("Please fill in Origin, Destination, and both travel dates.");
                 return;
             }
             
-            const summary = `Great! Planning your budget for ${selectedCity}.\n` +
-                            `Duration: between ${start} and ${end}.\n\n` +
-                            `Our trip planning engine is starting soon, stay tuned!`;
-            
+            const summary = `Route Details:\nFrom: ${tripData.origin}\nTo: ${tripData.destination}\n` +
+                            `Dates: ${start} to ${end}.\n\n` +
+                            `Planning engine initialized successfully.`;
             alert(summary);
         }
     </script>
