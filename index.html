@@ -41,13 +41,13 @@
         // Set start date minimum to today
         document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
 
-        // Load data from the new JSON file
+        // Load data from the external JSON file
         fetch('countries+cities.json')
             .then(response => response.json())
             .then(data => { allData = data; })
             .catch(error => console.error('Error loading data:', error));
 
-        // Optimized filter function for hierarchical data
+        // Optimized flexible search engine
         function filterCities(val) {
             const results = document.getElementById('cityResults');
             results.innerHTML = '';
@@ -55,18 +55,17 @@
             
             if (val.length < 2) { results.style.display = 'none'; return; }
 
+            const query = val.toLowerCase();
             let filteredResults = [];
             
-            // Search through each country
             allData.forEach(country => {
-                const foundCities = country.cities.filter(city => 
-                    city.toLowerCase().includes(val.toLowerCase())
-                );
-                
-                // Add matches (limit results for performance)
-                foundCities.forEach(city => {
-                    if (filteredResults.length < 10) {
-                        filteredResults.push(`${city}, ${country.name}`);
+                country.cities.forEach(city => {
+                    const fullMatchString = `${city.toLowerCase()}, ${country.name.toLowerCase()}`;
+                    
+                    if (fullMatchString.includes(query)) {
+                        if (filteredResults.length < 10) {
+                            filteredResults.push(`${city}, ${country.name}`);
+                        }
                     }
                 });
             });
@@ -88,6 +87,7 @@
             }
         }
 
+        // Restrict end date to be equal or after start date
         function updateMinEndDate() {
             const startDate = document.getElementById('startDate').value;
             const endDateInput = document.getElementById('endDate');
@@ -95,15 +95,16 @@
             if (endDateInput.value && endDateInput.value < startDate) endDateInput.value = '';
         }
 
+        // Validate and summarize the trip plan
         function submitTrip() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
+            
             if (!selectedCity || !start || !end || end <= start) {
                 alert("Please complete the form with valid trip details.");
-            return;
+                return;
             }
             
-            // Professional summary message with selected details
             const summary = `Great! Planning your budget for ${selectedCity}.\n` +
                             `Duration: between ${start} and ${end}.\n\n` +
                             `Our trip planning engine is starting soon, stay tuned!`;
