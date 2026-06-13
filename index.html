@@ -6,15 +6,9 @@
     <title>WayBudget - Professional Route Planner</title>
     <style>
         .container { 
-            max-width: 450px; 
-            margin: 60px auto; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            padding: 30px; 
-            border: 1px solid #ddd; 
-            border-radius: 12px; 
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15); 
-            background-color: #fff;
-            text-align: center; 
+            max-width: 450px; margin: 60px auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 30px; border: 1px solid #ddd; border-radius: 12px; 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15); background-color: #fff; text-align: center; 
         }
         h1 { color: #333; margin-bottom: 25px; }
         .input-group { margin-bottom: 20px; position: relative; text-align: left; }
@@ -78,7 +72,6 @@
         let allData = []; 
         let tripData = { origin: "", destination: "" };
 
-        // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
         });
@@ -90,9 +83,19 @@
             .catch(err => console.error('Data loading error:', err));
 
         /**
-         * Search Engine: Token-based filtering with relevance ranking
-         * @param {string} val - User search input
-         * @param {string} type - Identifier for the input field ('origin' or 'destination')
+         * Normalizes text to handle case sensitivity and special character variations.
+         * Converts characters like 'İ', 'I', 'ı', 'i' to a standardized 'i'.
+         */
+        function normalizeText(text) {
+            return text.normalize("NFKD") // Unicode decomposition
+                .replace(/[\u0300-\u036f]/g, "") // Remove accent marks
+                .toLowerCase()
+                .replace(/ı/g, 'i')
+                .replace(/i̇/g, 'i');
+        }
+
+        /**
+         * Search Engine: Token-based filtering with Unicode normalization.
          */
         function filterCities(val, type) {
             const results = document.getElementById(type + 'Results');
@@ -100,16 +103,18 @@
             
             if (val.length < 2) { results.style.display = 'none'; return; }
 
-            const queryTokens = val.toLowerCase().replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
+            const normalizedQuery = normalizeText(val);
+            const queryTokens = normalizedQuery.replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
             let matches = [];
 
             allData.forEach(country => {
                 country.cities.forEach(city => {
-                    const fullString = `${city.toLowerCase()} ${country.name.toLowerCase()}`;
+                    const fullString = normalizeText(`${city} ${country.name}`);
                     const isMatch = queryTokens.every(t => fullString.includes(t));
                     
                     if (isMatch) {
-                        let score = city.toLowerCase().startsWith(queryTokens[0]) ? 100 : 50;
+                        const normalizedCity = normalizeText(city);
+                        let score = normalizedCity.startsWith(queryTokens[0]) ? 100 : 50;
                         matches.push({ name: `${city}, ${country.name}`, score: score });
                     }
                 });
@@ -134,9 +139,6 @@
             }
         }
 
-        /**
-         * Date Validation: Ensures endDate is at least one day after startDate
-         */
         function updateMinEndDate() {
             const startDateValue = document.getElementById('startDate').value;
             if (!startDateValue) return;
@@ -153,9 +155,6 @@
             }
         }
 
-        /**
-         * Validation & Planning logic
-         */
         function submitTrip() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
