@@ -3,36 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WayBudget - Professional Route Planner</title>
+    <title>WayBudget - Compact Route Planner</title>
     <style>
         .container { 
-            max-width: 450px; margin: 60px auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            padding: 30px; border: 1px solid #ddd; border-radius: 12px; 
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15); background-color: #fff; text-align: center; 
+            max-width: 400px; margin: 40px auto; font-family: 'Segoe UI', Tahoma, sans-serif; 
+            padding: 20px; border: 1px solid #ddd; border-radius: 10px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); background-color: #fff; text-align: center; 
         }
-        h1 { color: #333; margin-bottom: 25px; }
-        .input-group { margin-bottom: 20px; position: relative; text-align: left; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        input { 
-            width: 100%; padding: 14px; box-sizing: border-box; 
-            border: 1px solid #ccc; border-radius: 6px; 
-            font-family: inherit; font-size: 15px; 
-        }
+        h1 { font-size: 22px; margin-bottom: 20px; color: #333; }
+        
+        .input-group { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; position: relative; }
+        label { flex: 0 0 70px; font-weight: 600; color: #555; text-align: left; font-size: 14px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        
         .city-results { 
             border: 1px solid #ccc; display: none; list-style: none; padding: 0; margin: 0; 
-            position: absolute; background: white; width: 100%; z-index: 1000; 
-            max-height: 200px; overflow-y: auto; border-radius: 5px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: absolute; top: 100%; left: 80px; width: calc(100% - 80px); 
+            z-index: 1000; max-height: 150px; overflow-y: auto; background: white; 
+            border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .city-results li { 
-            padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; 
-            font-size: 14px; color: #444; transition: background 0.2s;
-        }
+        .city-results li { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; text-align: left;}
         .city-results li:hover { background-color: #f7f7f7; }
+        
+        /* Duration display: Plain text at the bottom */
+        #durationDisplay { margin-top: 15px; font-size: 14px; color: #555; font-weight: 500; }
+        
         button { 
-            width: 100%; padding: 15px; background-color: #007bff; color: white; 
-            font-size: 16px; font-weight: bold; cursor: pointer; 
-            border: none; border-radius: 6px; margin-top: 10px; transition: background 0.3s;
+            width: 100%; padding: 12px; background-color: #007bff; color: white; 
+            border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 15px;
         }
         button:hover { background-color: #0056b3; }
     </style>
@@ -44,31 +42,32 @@
         
         <div class="input-group">
             <label for="origin">From:</label>
-            <input type="text" id="origin" placeholder="Departure city..." oninput="filterCities(this.value, 'origin')">
+            <input type="text" id="origin" placeholder="Departure..." oninput="filterCities(this.value, 'origin')">
             <ul id="originResults" class="city-results"></ul>
         </div>
 
         <div class="input-group">
             <label for="destination">To:</label>
-            <input type="text" id="destination" placeholder="Arrival city..." oninput="filterCities(this.value, 'destination')">
+            <input type="text" id="destination" placeholder="Arrival..." oninput="filterCities(this.value, 'destination')">
             <ul id="destinationResults" class="city-results"></ul>
         </div>
 
         <div class="input-group">
-            <label for="startDate">Start Date:</label>
-            <input type="date" id="startDate" onchange="updateMinEndDate()">
+            <label for="startDate">Start:</label>
+            <input type="date" id="startDate" onchange="updateMinEndDate(); calculateDuration();">
         </div>
 
         <div class="input-group">
-            <label for="endDate">End Date:</label>
-            <input type="date" id="endDate">
+            <label for="endDate">End:</label>
+            <input type="date" id="endDate" onchange="calculateDuration()">
         </div>
 
         <button type="button" onclick="submitTrip()">Plan My Route</button>
+
+        <div id="durationDisplay"></div>
     </div>
 
     <script>
-        // --- Global State ---
         let allData = []; 
         let tripData = { origin: "", destination: "" };
 
@@ -76,35 +75,22 @@
             document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
         });
 
-        // --- Data Loading ---
         fetch('countries+cities.json')
             .then(res => res.json())
             .then(data => { allData = data; })
             .catch(err => console.error('Data loading error:', err));
 
-        /**
-         * Normalizes text to handle case sensitivity and special character variations.
-         * Converts characters like 'İ', 'I', 'ı', 'i' to a standardized 'i'.
-         */
         function normalizeText(text) {
-            return text.normalize("NFKD") // Unicode decomposition
-                .replace(/[\u0300-\u036f]/g, "") // Remove accent marks
-                .toLowerCase()
-                .replace(/ı/g, 'i')
-                .replace(/i̇/g, 'i');
+            return text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+                .replace(/ı/g, 'i').replace(/i̇/g, 'i');
         }
 
-        /**
-         * Search Engine: Token-based filtering with Unicode normalization.
-         */
         function filterCities(val, type) {
             const results = document.getElementById(type + 'Results');
             results.innerHTML = '';
-            
             if (val.length < 2) { results.style.display = 'none'; return; }
 
-            const normalizedQuery = normalizeText(val);
-            const queryTokens = normalizedQuery.replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
+            const queryTokens = normalizeText(val).replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
             let matches = [];
 
             allData.forEach(country => {
@@ -113,8 +99,7 @@
                     const isMatch = queryTokens.every(t => fullString.includes(t));
                     
                     if (isMatch) {
-                        const normalizedCity = normalizeText(city);
-                        let score = normalizedCity.startsWith(queryTokens[0]) ? 100 : 50;
+                        let score = normalizeText(city).startsWith(queryTokens[0]) ? 100 : 50;
                         matches.push({ name: `${city}, ${country.name}`, score: score });
                     }
                 });
@@ -134,24 +119,34 @@
                     };
                     results.appendChild(li);
                 });
-            } else {
-                results.style.display = 'none';
-            }
+            } else { results.style.display = 'none'; }
         }
 
         function updateMinEndDate() {
-            const startDateValue = document.getElementById('startDate').value;
-            if (!startDateValue) return;
-
-            const startDate = new Date(startDateValue);
-            const minEndDate = new Date(startDate);
-            minEndDate.setDate(startDate.getDate() + 1);
-            
+            const startVal = document.getElementById('startDate').value;
+            if (!startVal) return;
+            const minEnd = new Date(startVal);
+            minEnd.setDate(minEnd.getDate() + 1);
             const endDateInput = document.getElementById('endDate');
-            endDateInput.min = minEndDate.toISOString().split('T')[0];
-            
-            if (endDateInput.value && endDateInput.value <= startDateValue) {
-                endDateInput.value = '';
+            endDateInput.min = minEnd.toISOString().split('T')[0];
+            if (endDateInput.value && endDateInput.value <= startVal) endDateInput.value = '';
+            calculateDuration();
+        }
+
+        function calculateDuration() {
+            const startVal = document.getElementById('startDate').value;
+            const endVal = document.getElementById('endDate').value;
+            const display = document.getElementById('durationDisplay');
+
+            if (startVal && endVal) {
+                const start = new Date(startVal);
+                const end = new Date(endVal);
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                display.textContent = `Duration: ${diffDays} nights, ${diffDays + 1} days`;
+            } else {
+                display.textContent = "";
             }
         }
 
@@ -164,10 +159,7 @@
                 return;
             }
             
-            const summary = `Route Details:\nFrom: ${tripData.origin}\nTo: ${tripData.destination}\n` +
-                            `Dates: ${start} to ${end}.\n\n` +
-                            `Planning engine initialized successfully.`;
-            alert(summary);
+            alert(`Route: ${tripData.origin} ➔ ${tripData.destination}\nDates: ${start} to ${end}.`);
         }
     </script>
 </body>
