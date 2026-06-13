@@ -52,22 +52,22 @@
     </div>
 
     <script>
-        // Global variables for data storage and state management
+        // Global storage for the dataset
         let allData = []; 
         let selectedCity = ""; 
 
         // Set minimum start date to today to prevent past travel bookings
         document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
 
-        // Fetch city/country dataset from the JSON file
+        // Fetch dataset from external JSON file
         fetch('countries+cities.json')
             .then(response => response.json())
             .then(data => { allData = data; })
             .catch(error => console.error('Error loading data:', error));
 
         /**
-         * Search engine with prefix matching and relevance ranking.
-         * Ranks results based on how closely they start with the query.
+         * Token-based Search Engine
+         * Splits input into words and matches them against cities and countries independently.
          */
         function filterCities(val) {
             const results = document.getElementById('cityResults');
@@ -76,38 +76,26 @@
             
             if (val.length < 2) { results.style.display = 'none'; return; }
 
-            const query = val.toLowerCase().replace(/,/g, ' ');
+            // Normalize input: replace commas with spaces and split into tokens for flexible search
+            const queryTokens = val.toLowerCase().replace(/,/g, ' ').split(' ').filter(token => token.length > 0);
             let matches = [];
             
-            // Iterate through dataset to find matches and assign relevance scores
             allData.forEach(country => {
                 country.cities.forEach(city => {
-                    const cityName = city.toLowerCase();
-                    const countryName = country.name.toLowerCase();
-                    const fullString = `${cityName} ${countryName}`;
+                    const fullMatchString = `${city.toLowerCase()} ${country.name.toLowerCase()}`;
                     
-                    let score = 0;
+                    // Check if every word in the query exists in the city/country record
+                    const isMatch = queryTokens.every(token => fullMatchString.includes(token));
                     
-                    // High priority: City name starts with query
-                    if (cityName.startsWith(query)) {
-                        score = 100;
-                    } 
-                    // Medium priority: Query found within city name
-                    else if (cityName.includes(query)) {
-                        score = 50;
-                    }
-                    // Lower priority: Query found in country name
-                    else if (countryName.startsWith(query)) {
-                        score = 30;
-                    }
-
-                    if (score > 0) {
+                    if (isMatch) {
+                        // Scoring: Prioritize matches where the city name starts with the first token for better UX
+                        let score = city.toLowerCase().startsWith(queryTokens[0]) ? 100 : 50;
                         matches.push({ name: `${city}, ${country.name}`, score: score });
                     }
                 });
             });
 
-            // Sort results by score in descending order
+            // Sort matches by relevance score
             matches.sort((a, b) => b.score - a.score);
 
             // Display top 10 relevant results
@@ -128,16 +116,32 @@
             }
         }
 
-        // Restrict end date to be equal or after start date
+        /**
+         * Restricts end date to be at least one day after the start date.
+         */
         function updateMinEndDate() {
-            const startDate = document.getElementById('startDate').value;
+            const startDateValue = document.getElementById('startDate').value;
+            if (!startDateValue) return;
+
+            // Calculate minimum end date (start date + 1 day)
+            const startDate = new Date(startDateValue);
+            const minEndDate = new Date(startDate);
+            minEndDate.setDate(startDate.getDate() + 1);
+
+            // Format as YYYY-MM-DD
+            const minEndDateString = minEndDate.toISOString().split('T')[0];
+            
             const endDateInput = document.getElementById('endDate');
-            endDateInput.min = startDate;
-            if (endDateInput.value && endDateInput.value < startDate) endDateInput.value = '';
+            endDateInput.min = minEndDateString;
+            
+            // If the current end date is invalid, clear it
+            if (endDateInput.value && endDateInput.value <= startDateValue) {
+                endDateInput.value = '';
+            }
         }
 
         /**
-         * Validates inputs and provides a summary of the planned trip.
+         * Validates inputs and provides a trip summary.
          */
         function submitTrip() {
             const start = document.getElementById('startDate').value;
@@ -148,7 +152,6 @@
                 return;
             }
             
-            // Generate trip summary for the user
             const summary = `Great! Planning your budget for ${selectedCity}.\n` +
                             `Duration: between ${start} and ${end}.\n\n` +
                             `Our trip planning engine is starting soon, stay tuned!`;
