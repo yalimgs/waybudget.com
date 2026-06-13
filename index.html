@@ -6,32 +6,33 @@
 </head>
 <body>
     <h1>Welcome to WayBudget</h1>
-    <p>Please enter your travel details:</p>
-
     <form id="tripForm">
         <label for="destination">Destination (City):</label>
-        <input type="text" id="destination" name="destination" placeholder="Enter city" required>
+        <input list="cities" id="destination" name="destination" placeholder="Type or select a city" required>
+        <datalist id="cities"></datalist>
+        
         <br><br>
-
         <label for="date">Travel Date:</label>
         <input type="date" id="date" name="date" required>
         <br><br>
-
         <button type="button" onclick="submitTrip()">Plan My Budget</button>
     </form>
 
     <script>
-        function submitTrip() {
-            const dest = document.getElementById('destination').value;
-            const date = document.getElementById('date').value;
-            const today = new Date().toISOString().split('T')[0];
+        // Sayfa yüklendiğinde JSON dosyasını çek
+        fetch('cities.json')
+            .then(response => response.json())
+            .then(data => {
+                const dataList = document.getElementById('cities');
+                data.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city;
+                    dataList.appendChild(option);
+                });
+            });
 
-            if (date < today) {
-                alert("Please select today or a future date.");
-            } else {
-                alert("Planning your budget for " + dest + " on " + date);
-                // Burada ileride AI server'ına bağlanacağız
-            }
+        function submitTrip() {
+            // ... (submitTrip fonksiyonun aynı kalabilir)
         }
     </script>
 </body>
