@@ -100,9 +100,15 @@
             const end = document.getElementById('endDate').value;
             if (!selectedCity || !start || !end || end <= start) {
                 alert("Please complete the form with valid trip details.");
-                return;
+            return;
             }
-            alert("Great! Planning your budget for " + selectedCity + "...");
+            
+            // Professional summary message with selected details
+            const summary = `Great! Planning your budget for ${selectedCity}.\n` +
+                            `Duration: between ${start} and ${end}.\n\n` +
+                            `Our trip planning engine is starting soon, stay tuned!`;
+            
+            alert(summary);
         }
     </script>
 </body>
