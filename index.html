@@ -54,9 +54,17 @@
     </div>
 
     <script>
-        // List of available cities for the autocomplete feature
-        const allCities = ["Istanbul", "Antalya", "Bodrum", "Izmir", "Ankara", "Cappadocia", "Fethiye", "Cesme", "Kas"];
+        // Array to store cities loaded from the JSON file
+        let allCities = [];
         let selectedCity = ""; 
+
+        // Fetch city list from external JSON file on page load
+        fetch('cities.json')
+            .then(response => response.json())
+            .then(data => {
+                allCities = data;
+            })
+            .catch(error => console.error('Error loading cities:', error));
 
         // Filter the city list based on user input
         function filterCities(val) {
