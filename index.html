@@ -5,113 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WayBudget - Plan Your Trip</title>
     <style>
-        .container { 
-            max-width: 400px; margin: 50px auto; font-family: 'Segoe UI', sans-serif; 
-            padding: 20px; border: 1px solid #ddd; border-radius: 10px; 
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; 
-        }
+        .container { max-width: 400px; margin: 50px auto; font-family: 'Segoe UI', sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
         .input-group { margin-bottom: 15px; position: relative; text-align: left; }
         input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-        
-        #cityResults { 
-            border: 1px solid #ccc; display:none; list-style:none; padding:0; margin:0; 
-            position: absolute; background: white; width: 100%; z-index: 1000; 
-            max-height: 150px; overflow-y: auto; border-radius: 5px;
-        }
+        #cityResults { border: 1px solid #ccc; display:none; list-style:none; padding:0; margin:0; position: absolute; background: white; width: 100%; z-index: 1000; max-height: 200px; overflow-y: auto; border-radius: 5px; }
         #cityResults li { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
         #cityResults li:hover { background-color: #f0f0f0; }
-        
-        button {
-            width: 100%; padding: 12px; background-color: #007bff; color: white;
-            font-weight: bold; cursor: pointer; border: none; border-radius: 5px; margin-top: 10px;
-        }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>WayBudget</h1>
-        
         <div class="input-group">
             <label for="destination">Destination (City, Country):</label>
-            <input type="text" id="destination" placeholder="Type to search..." oninput="filterCities(this.value)">
+            <input type="text" id="destination" placeholder="Search city or country..." oninput="filterCities(this.value)">
             <ul id="cityResults"></ul>
         </div>
-
         <div class="input-group">
             <label for="startDate">Start Date:</label>
-            <input type="date" id="startDate" onchange="updateEndDateConstraints()">
+            <input type="date" id="startDate" onchange="updateMinEndDate()">
         </div>
-
         <div class="input-group">
             <label for="endDate">End Date:</label>
             <input type="date" id="endDate">
         </div>
-
         <button type="button" onclick="submitTrip()">Plan My Budget</button>
     </div>
 
     <script>
-        let allCities = [];
+        let allData = []; // To store the entire JSON structure
         let selectedCity = ""; 
 
-        // Set the minimum selectable date for start date as today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('startDate').setAttribute('min', today);
+        // Set start date minimum to today
+        document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
 
-        fetch('cities.json')
+        // Load data from the new JSON file
+        fetch('countries+cities.json')
             .then(response => response.json())
-            .then(data => { allCities = data; })
-            .catch(error => console.error('Error loading cities:', error));
+            .then(data => { allData = data; })
+            .catch(error => console.error('Error loading data:', error));
 
+        // Optimized filter function for hierarchical data
         function filterCities(val) {
             const results = document.getElementById('cityResults');
             results.innerHTML = '';
             selectedCity = ""; 
-            if (val.length > 0) {
-                const filtered = allCities.filter(c => c.toLowerCase().includes(val.toLowerCase()));
-                if (filtered.length > 0) {
-                    results.style.display = 'block';
-                    filtered.forEach(city => {
-                        const li = document.createElement('li');
-                        li.textContent = city;
-                        li.onclick = () => { 
-                            document.getElementById('destination').value = city;
-                            selectedCity = city; 
-                            results.style.display = 'none';
-                        };
-                        results.appendChild(li);
-                    });
-                    return;
-                }
+            
+            if (val.length < 2) { results.style.display = 'none'; return; }
+
+            let filteredResults = [];
+            
+            // Search through each country
+            allData.forEach(country => {
+                const foundCities = country.cities.filter(city => 
+                    city.toLowerCase().includes(val.toLowerCase())
+                );
+                
+                // Add matches (limit results for performance)
+                foundCities.forEach(city => {
+                    if (filteredResults.length < 10) {
+                        filteredResults.push(`${city}, ${country.name}`);
+                    }
+                });
+            });
+
+            if (filteredResults.length > 0) {
+                results.style.display = 'block';
+                filteredResults.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    li.onclick = () => { 
+                        document.getElementById('destination').value = item;
+                        selectedCity = item; 
+                        results.style.display = 'none';
+                    };
+                    results.appendChild(li);
+                });
+            } else {
+                results.style.display = 'none';
             }
-            results.style.display = 'none';
         }
 
-        // Dynamically update end date minimum constraint based on start date
-        function updateEndDateConstraints() {
+        function updateMinEndDate() {
             const startDate = document.getElementById('startDate').value;
             const endDateInput = document.getElementById('endDate');
-            
-            // End date cannot be before start date
             endDateInput.min = startDate;
-            
-            // Clear end date if it is no longer valid
-            if (endDateInput.value && endDateInput.value < startDate) {
-                endDateInput.value = '';
-            }
+            if (endDateInput.value && endDateInput.value < startDate) endDateInput.value = '';
         }
 
         function submitTrip() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
-
-            if (!selectedCity) { alert("Please select a destination from the list."); return; }
-            if (!start) { alert("Please select a start date."); return; }
-            if (!end) { alert("Please select an end date."); return; }
-            if (end <= start) { alert("End date must be after the start date."); return; }
-
-            alert("Great! Planning your budget for " + selectedCity + " from " + start + " to " + end + ".");
+            if (!selectedCity || !start || !end || end <= start) {
+                alert("Please complete the form with valid trip details.");
+                return;
+            }
+            alert("Great! Planning your budget for " + selectedCity + "...");
         }
     </script>
 </body>
