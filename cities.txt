@@ -1,0 +1,11 @@
+[
+  "Istanbul",
+  "Antalya",
+  "Bodrum",
+  "Izmir",
+  "Ankara",
+  "Cappadocia",
+  "Fethiye",
+  "Cesme",
+  "Kas"
+]
