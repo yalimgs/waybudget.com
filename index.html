@@ -5,13 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WayBudget - Plan Your Trip</title>
     <style>
-        .container { max-width: 400px; margin: 50px auto; font-family: 'Segoe UI', sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
+        .container { 
+            max-width: 400px; margin: 50px auto; font-family: 'Segoe UI', sans-serif; 
+            padding: 20px; border: 1px solid #ddd; border-radius: 10px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; 
+        }
         .input-group { margin-bottom: 15px; position: relative; text-align: left; }
-        input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-        #cityResults { border: 1px solid #ccc; display:none; list-style:none; padding:0; margin:0; position: absolute; background: white; width: 100%; z-index: 1000; max-height: 200px; overflow-y: auto; border-radius: 5px; }
-        #cityResults li { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+        input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+        
+        #cityResults { 
+            border: 1px solid #ccc; display:none; list-style:none; padding:0; margin:0; 
+            position: absolute; background: white; width: 100%; z-index: 1000; 
+            max-height: 200px; overflow-y: auto; border-radius: 5px; 
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #cityResults li { 
+            padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; 
+            font-size: 14px; color: #333;
+        }
         #cityResults li:hover { background-color: #f0f0f0; }
-        button { width: 100%; padding: 12px; background-color: #007bff; color: white; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; margin-top: 10px; }
+        
+        button { 
+            width: 100%; padding: 12px; background-color: #007bff; color: white; 
+            font-weight: bold; cursor: pointer; border: none; border-radius: 5px; margin-top: 10px; 
+        }
     </style>
 </head>
 <body>
@@ -35,19 +52,23 @@
     </div>
 
     <script>
-        let allData = []; // To store the entire JSON structure
+        // Global variables for data storage and state management
+        let allData = []; 
         let selectedCity = ""; 
 
-        // Set start date minimum to today
+        // Set minimum start date to today to prevent past travel bookings
         document.getElementById('startDate').setAttribute('min', new Date().toISOString().split('T')[0]);
 
-        // Load data from the external JSON file
+        // Fetch city/country dataset from the JSON file
         fetch('countries+cities.json')
             .then(response => response.json())
             .then(data => { allData = data; })
             .catch(error => console.error('Error loading data:', error));
 
-        // Optimized flexible search engine
+        /**
+         * Search engine with prefix matching and relevance ranking.
+         * Ranks results based on how closely they start with the query.
+         */
         function filterCities(val) {
             const results = document.getElementById('cityResults');
             results.innerHTML = '';
@@ -55,29 +76,49 @@
             
             if (val.length < 2) { results.style.display = 'none'; return; }
 
-            const query = val.toLowerCase();
-            let filteredResults = [];
+            const query = val.toLowerCase().replace(/,/g, ' ');
+            let matches = [];
             
+            // Iterate through dataset to find matches and assign relevance scores
             allData.forEach(country => {
                 country.cities.forEach(city => {
-                    const fullMatchString = `${city.toLowerCase()}, ${country.name.toLowerCase()}`;
+                    const cityName = city.toLowerCase();
+                    const countryName = country.name.toLowerCase();
+                    const fullString = `${cityName} ${countryName}`;
                     
-                    if (fullMatchString.includes(query)) {
-                        if (filteredResults.length < 10) {
-                            filteredResults.push(`${city}, ${country.name}`);
-                        }
+                    let score = 0;
+                    
+                    // High priority: City name starts with query
+                    if (cityName.startsWith(query)) {
+                        score = 100;
+                    } 
+                    // Medium priority: Query found within city name
+                    else if (cityName.includes(query)) {
+                        score = 50;
+                    }
+                    // Lower priority: Query found in country name
+                    else if (countryName.startsWith(query)) {
+                        score = 30;
+                    }
+
+                    if (score > 0) {
+                        matches.push({ name: `${city}, ${country.name}`, score: score });
                     }
                 });
             });
 
-            if (filteredResults.length > 0) {
+            // Sort results by score in descending order
+            matches.sort((a, b) => b.score - a.score);
+
+            // Display top 10 relevant results
+            if (matches.length > 0) {
                 results.style.display = 'block';
-                filteredResults.forEach(item => {
+                matches.slice(0, 10).forEach(item => {
                     const li = document.createElement('li');
-                    li.textContent = item;
+                    li.textContent = item.name;
                     li.onclick = () => { 
-                        document.getElementById('destination').value = item;
-                        selectedCity = item; 
+                        document.getElementById('destination').value = item.name;
+                        selectedCity = item.name; 
                         results.style.display = 'none';
                     };
                     results.appendChild(li);
@@ -95,7 +136,9 @@
             if (endDateInput.value && endDateInput.value < startDate) endDateInput.value = '';
         }
 
-        // Validate and summarize the trip plan
+        /**
+         * Validates inputs and provides a summary of the planned trip.
+         */
         function submitTrip() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
@@ -105,6 +148,7 @@
                 return;
             }
             
+            // Generate trip summary for the user
             const summary = `Great! Planning your budget for ${selectedCity}.\n` +
                             `Duration: between ${start} and ${end}.\n\n` +
                             `Our trip planning engine is starting soon, stay tuned!`;
