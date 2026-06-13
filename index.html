@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WayBudget - Compact Route Planner</title>
+    <title>WayBudget - Route Budget Planner</title>
     <style>
         .container { 
             max-width: 400px; margin: 40px auto; font-family: 'Segoe UI', Tahoma, sans-serif; 
@@ -25,8 +25,8 @@
         .city-results li { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; text-align: left;}
         .city-results li:hover { background-color: #f7f7f7; }
         
-        /* Duration display: Plain text at the bottom */
-        #durationDisplay { margin-top: 15px; font-size: 14px; color: #555; font-weight: 500; }
+        /* Centered summary display */
+        #summaryDisplay { margin-top: 15px; font-size: 14px; color: #555; font-weight: 500; text-align: center; line-height: 1.6; }
         
         button { 
             width: 100%; padding: 12px; background-color: #007bff; color: white; 
@@ -54,17 +54,17 @@
 
         <div class="input-group">
             <label for="startDate">Start:</label>
-            <input type="date" id="startDate" onchange="updateMinEndDate(); calculateDuration();">
+            <input type="date" id="startDate" onchange="updateMinEndDate(); updateRouteSummary();">
         </div>
 
         <div class="input-group">
             <label for="endDate">End:</label>
-            <input type="date" id="endDate" onchange="calculateDuration()">
+            <input type="date" id="endDate" onchange="updateRouteSummary()">
         </div>
 
         <button type="button" onclick="submitTrip()">Plan My Route</button>
 
-        <div id="durationDisplay"></div>
+        <div id="summaryDisplay"></div>
     </div>
 
     <script>
@@ -116,10 +116,28 @@
                         document.getElementById(type).value = item.name;
                         tripData[type] = item.name;
                         results.style.display = 'none';
+                        updateRouteSummary();
                     };
                     results.appendChild(li);
                 });
             } else { results.style.display = 'none'; }
+        }
+
+        function updateRouteSummary() {
+            const startVal = document.getElementById('startDate').value;
+            const endVal = document.getElementById('endDate').value;
+            const display = document.getElementById('summaryDisplay');
+            
+            let lines = [];
+            if (tripData.origin && tripData.destination) lines.push(`Route: ${tripData.origin} ➔ ${tripData.destination}`);
+            if (startVal && endVal) {
+                lines.push(`Dates: ${startVal} to ${endVal}`);
+                const start = new Date(startVal);
+                const end = new Date(endVal);
+                const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
+                lines.push(`Duration: ${diffDays} nights, ${diffDays + 1} days`);
+            }
+            display.innerHTML = lines.join('<br>');
         }
 
         function updateMinEndDate() {
@@ -130,24 +148,7 @@
             const endDateInput = document.getElementById('endDate');
             endDateInput.min = minEnd.toISOString().split('T')[0];
             if (endDateInput.value && endDateInput.value <= startVal) endDateInput.value = '';
-            calculateDuration();
-        }
-
-        function calculateDuration() {
-            const startVal = document.getElementById('startDate').value;
-            const endVal = document.getElementById('endDate').value;
-            const display = document.getElementById('durationDisplay');
-
-            if (startVal && endVal) {
-                const start = new Date(startVal);
-                const end = new Date(endVal);
-                const diffTime = Math.abs(end - start);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                display.textContent = `Duration: ${diffDays} nights, ${diffDays + 1} days`;
-            } else {
-                display.textContent = "";
-            }
+            updateRouteSummary();
         }
 
         function submitTrip() {
@@ -159,7 +160,9 @@
                 return;
             }
             
-            alert(`Route: ${tripData.origin} ➔ ${tripData.destination}\nDates: ${start} to ${end}.`);
+            alert(`Route: ${tripData.origin} ➔ ${tripData.destination}\n` +
+                  `Dates: ${start} to ${end}.\n\n` +
+                  `WayBudget budget planner is coming soon, stay tuned!`);
         }
     </script>
 </body>
