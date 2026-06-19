@@ -1,0 +1,112 @@
+/* ============================================================================
+   Module: style.css
+   Purpose: Defines the visual layout and component styling for WayBudget.
+   ============================================================================ */
+
+/* Container styling for the main application layout */
+.container { 
+    max-width: 400px; 
+    margin: 40px auto; 
+    font-family: 'Segoe UI', Tahoma, sans-serif; 
+    padding: 20px; 
+    border: 1px solid #ddd; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+    background-color: #fff; 
+    text-align: center; 
+}
+
+/* Header typography */
+h1 { 
+    font-size: 22px; 
+    margin-bottom: 20px; 
+    color: #333; 
+}
+
+/* Styling for input groups with flexible layout */
+.input-group { 
+    margin-bottom: 12px; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    position: relative; 
+}
+
+/* Form labels with fixed width */
+label { 
+    flex: 0 0 70px; 
+    font-weight: 600; 
+    color: #555; 
+    text-align: left; 
+    font-size: 14px; 
+}
+
+/* Input fields for user entries */
+input { 
+    flex: 1; 
+    padding: 10px; 
+    border: 1px solid #ccc; 
+    border-radius: 4px; 
+    font-size: 14px; 
+}
+
+/* Dropdown styling for city search results */
+.city-results { 
+    border: 1px solid #ccc; 
+    display: none; 
+    list-style: none; 
+    padding: 0; 
+    margin: 0; 
+    position: absolute; 
+    top: 100%; 
+    left: 80px; 
+    width: calc(100% - 80px); 
+    z-index: 1000; 
+    max-height: 150px; 
+    overflow-y: auto; 
+    background: white; 
+    border-radius: 4px; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Individual item styling for search results */
+.city-results li { 
+    padding: 8px; 
+    cursor: pointer; 
+    border-bottom: 1px solid #eee; 
+    font-size: 13px; 
+    text-align: left;
+}
+
+/* Hover state for search results */
+.city-results li:hover { 
+    background-color: #f7f7f7; 
+}
+
+/* Display area for trip duration and route summary */
+#summaryDisplay { 
+    margin-top: 15px; 
+    font-size: 14px; 
+    color: #555; 
+    font-weight: 500; 
+    text-align: center; 
+    line-height: 1.6; 
+}
+
+/* Button styling for primary actions */
+button { 
+    width: 100%; 
+    padding: 12px; 
+    background-color: #007bff; 
+    color: white; 
+    border: none; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    margin-top: 15px;
+}
+
+/* Hover state for primary action buttons */
+button:hover { 
+    background-color: #0056b3; 
+}
