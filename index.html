@@ -25,7 +25,6 @@
         .city-results li { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; text-align: left;}
         .city-results li:hover { background-color: #f7f7f7; }
         
-        /* Centered summary display */
         #summaryDisplay { margin-top: 15px; font-size: 14px; color: #555; font-weight: 500; text-align: center; line-height: 1.6; }
         
         button { 
@@ -87,6 +86,15 @@
 
         function filterCities(val, type) {
             const results = document.getElementById(type + 'Results');
+            
+            // Eğer input silinirse, veriyi temizle ve özeti güncelle
+            if (val.trim() === "") {
+                tripData[type] = "";
+                results.style.display = 'none';
+                updateRouteSummary();
+                return;
+            }
+
             results.innerHTML = '';
             if (val.length < 2) { results.style.display = 'none'; return; }
 
@@ -130,6 +138,7 @@
             
             let lines = [];
             if (tripData.origin && tripData.destination) lines.push(`Route: ${tripData.origin} ➔ ${tripData.destination}`);
+            
             if (startVal && endVal) {
                 lines.push(`Dates: ${startVal} to ${endVal}`);
                 const start = new Date(startVal);
@@ -142,12 +151,20 @@
 
         function updateMinEndDate() {
             const startVal = document.getElementById('startDate').value;
-            if (!startVal) return;
+            const endDateInput = document.getElementById('endDate');
+            
+            if (!startVal) {
+                endDateInput.min = "";
+                return;
+            }
+            
             const minEnd = new Date(startVal);
             minEnd.setDate(minEnd.getDate() + 1);
-            const endDateInput = document.getElementById('endDate');
             endDateInput.min = minEnd.toISOString().split('T')[0];
-            if (endDateInput.value && endDateInput.value <= startVal) endDateInput.value = '';
+            
+            if (endDateInput.value && endDateInput.value <= startVal) {
+                endDateInput.value = '';
+            }
             updateRouteSummary();
         }
 
