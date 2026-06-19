@@ -1,8 +1,3 @@
-<!-- ============================================================================
-// File: index.html
-// Purpose: Main entry point for the WayBudget application. Defines the UI structure.
-// ============================================================================ -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WayBudget - Route Budget Planner</title>
     
-    <!-- Link to external stylesheet for application styling -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,21 +12,18 @@
     <div class="container">
         <h1>WayBudget</h1>
         
-        <!-- Input section for departure city selection with auto-complete capability -->
         <div class="input-group">
             <label for="origin">From:</label>
             <input type="text" id="origin" placeholder="Departure..." oninput="filterCities(this.value, 'origin')">
             <ul id="originResults" class="city-results"></ul>
         </div>
 
-        <!-- Input section for destination city selection with auto-complete capability -->
         <div class="input-group">
             <label for="destination">To:</label>
             <input type="text" id="destination" placeholder="Arrival..." oninput="filterCities(this.value, 'destination')">
             <ul id="destinationResults" class="city-results"></ul>
         </div>
 
-        <!-- Date selection fields for trip duration calculation -->
         <div class="input-group">
             <label for="startDate">Start:</label>
             <input type="date" id="startDate" onchange="updateMinEndDate(); updateRouteSummary();">
@@ -43,14 +34,18 @@
             <input type="date" id="endDate" onchange="updateRouteSummary()">
         </div>
 
-        <!-- Main action button to initiate the route planning process -->
+        <div class="input-group">
+            <label for="passengers">Travelers:</label>
+            <input type="number" id="passengers" min="1" value="1" 
+                   onkeydown="return event.keyCode !== 189 && event.keyCode !== 187 && event.keyCode !== 69" 
+                   oninput="updateRouteSummary()">
+        </div>
+
         <button type="button" onclick="submitTrip()">Plan My Route</button>
 
-        <!-- Container for displaying the calculated route and budget summary -->
         <div id="summaryDisplay"></div>
     </div>
 
-    <!-- Scripts for city searching logic and main application functionality -->
     <script src="search.js"></script>
     <script src="app.js"></script>
 </body>
