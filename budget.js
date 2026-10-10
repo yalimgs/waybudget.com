@@ -58,7 +58,6 @@ const BUDGET_MODEL = {
     // Premium = business class (multiple of economy, larger on long haul)
     flightFactor: { economy: 0.85, standard: 1 },
     businessFactor: [[1500, 2.5], [4000, 3], [Infinity, 4]],   // [up to km, × standard fare]
-    directFallbackFactor: 1.18,       // no direct flight seen: standard ≈ cheapest × 1.18
 
     defaultLevel: 0.5                 // countries with no price data
 };
@@ -136,19 +135,19 @@ function calculateBudget(trip, choices, live = {}) {
     const route = `Round trip ${origin.a[0]} ⇄ ${destination.a[0]}`;
     const fl = live.flights && live.flights.found ? live.flights : null;
     if (fl) {
-        const seen = fl.match === 'month' ? 'Lowest fare seen recently for these months' : 'Fare seen recently for these dates';
-        const directOrEst = fl.direct ? fl.direct.price : fl.economy.price * M.directFallbackFactor;
+        const seen = fl.match === 'month' ? 'Fares seen recently for these months' : 'Fares seen recently for these dates';
         let perPerson, kind = 'live', info, source = `${seen} (Aviasales)`;
         if (choices.flights === 'economy') {
             perPerson = fl.economy.price;
             info = describeFare(fl.economy);
+            source = `Lowest of ${fl.fares} ${source.toLowerCase()}`;
         } else if (choices.flights === 'standard') {
-            perPerson = directOrEst;
-            if (fl.direct) info = describeFare(fl.direct);
-            else { kind = 'estimate'; info = 'No direct flights seen'; source = 'Estimated from the lowest live fare'; }
+            perPerson = fl.standard.price;
+            info = describeFare(fl.standard);
+            source = `Typical (median) of ${fl.fares} ${source.toLowerCase()}`;
         } else {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
-            perPerson = directOrEst * factor;
+            perPerson = fl.standard.price * factor;
             kind = 'estimate'; info = 'Business class';
             source = 'Estimated from live economy fares';
         }
@@ -161,9 +160,8 @@ function calculateBudget(trip, choices, live = {}) {
         const perPerson = estimateFlightPerPerson(km, choices.flights);
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}` +
-                    (live.loading ? ' · checking live fares…' : ''),
-            amount: perPerson * travelers, kind: 'rough',
+            detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
+            amount: perPerson * travelers, kind: live.loading ? 'loading' : 'rough',
             source: live.loading ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'
         });
     }
@@ -182,9 +180,8 @@ function calculateBudget(trip, choices, live = {}) {
         const perNight = M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
             key: 'hotel', label: 'Accommodation',
-            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night` +
-                    (live.loading ? ' · checking live rates…' : ''),
-            amount: perNight * rooms * nights, kind: 'rough',
+            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
+            amount: perNight * rooms * nights, kind: live.loading ? 'loading' : 'rough',
             source: live.loading ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
         });
     }
@@ -257,7 +254,7 @@ async function fetchLivePrices(trip, startIso, endIso) {
     const { origin, destination, travelers } = trip;
     const get = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
     const flightsUrl = `/api/flights?origin=${origin.a[0]}&destination=${destination.a[0]}` +
-                       `&depart=${startIso}&return=${endIso}`;
+                       `&depart=${startIso}&return=${endIso}&v=2`;
     const hotelsUrl = `/api/hotels?lat=${destination.lat}&lon=${destination.lon}` +
                       `&checkin=${startIso}&checkout=${endIso}&adults=${Math.min(2, travelers)}`;
     const [flights, hotel] = await Promise.all([get(flightsUrl), get(hotelsUrl)]);

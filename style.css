@@ -389,6 +389,9 @@ input.invalid {
 .badge-live { background: #e1f5e8; color: #1e7b45; }
 .badge-estimate { background: #e3eef9; color: #2a5d93; }
 .badge-rough { background: #fdf0dc; color: #9a5b0b; }
+.badge-loading { background: #eef1f3; color: var(--ink-soft); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .badge-loading { animation: none; } }
 .budget-total {
     display: flex;
     align-items: center;

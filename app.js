@@ -253,7 +253,7 @@ let liveData = {};
 let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
-const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough' };
+const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough', loading: 'Working…' };
 
 async function renderBudget() {
     if (!currentTrip) return;

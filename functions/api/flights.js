@@ -3,8 +3,8 @@
 // Round-trip fares per passenger (USD) from the Travelpayouts / Aviasales
 // Flight Data API. These are prices real users saw in the last days (cached
 // by Aviasales), not a live booking quote.
-//   economy: cheapest fare (any number of stops)
-//   direct:  cheapest non-stop fare (null if none found)
+//   economy:  cheapest fare seen (any number of stops)
+//   standard: typical fare = median of fares seen, direct preferred
 // Exact dates are tried first; if nothing was seen for those dates, the
 // cheapest fares seen for the same months are returned (match: "month").
 // Responses are cached at the edge for 6 hours.
@@ -17,7 +17,7 @@ const TTL = 6 * 3600;
 async function query(env, p) {
     const url = new URL(API);
     Object.entries({ currency: 'usd', sorting: 'price', unique: 'false', limit: '100',
-                     one_way: 'false', ...p }).forEach(([k, v]) => url.searchParams.set(k, v));
+                     one_way: 'false', direct: 'false', ...p }).forEach(([k, v]) => url.searchParams.set(k, v));
     const res = await fetch(url, { headers: { 'X-Access-Token': env.TRAVELPAYOUTS_TOKEN } });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.success === false) {
@@ -28,25 +28,7 @@ async function query(env, p) {
 
 const DAY = 86400000;
 
-/*
- * Cheapest fare, preferring trips close to the requested dates: in month
- * mode a 2-day trip on the 10th says little about an 11-day trip on the 3rd.
- */
-function pick(list, depart, ret) {
-    const want = { dep: Date.parse(depart), len: (Date.parse(ret) - Date.parse(depart)) / DAY };
-    const fares = list.filter(x => typeof x.price === 'number' && x.departure_at && x.return_at)
-        .map(x => {
-            const dep = Date.parse(x.departure_at.slice(0, 10));
-            const len = (Date.parse(x.return_at.slice(0, 10)) - dep) / DAY;
-            return { x, dDep: Math.abs(dep - want.dep) / DAY, dLen: Math.abs(len - want.len) };
-        });
-    const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4, () => true];
-    let f = null;
-    for (const ok of tiers) {
-        const c = fares.filter(ok).sort((a, b) => a.x.price - b.x.price)[0];
-        if (c) { f = c.x; break; }
-    }
-    if (!f) return null;
+function fare(f) {
     return {
         price: f.price,
         airline: f.airline || null,
@@ -57,6 +39,35 @@ function pick(list, depart, ret) {
         duration: f.duration || null,
         link: f.link ? `https://www.aviasales.com${f.link}` : null
     };
+}
+
+/*
+ * From all fares seen, keep the ones closest to the requested trip (a 2-day
+ * trip on the 10th says little about an 11-day trip on the 3rd), then:
+ *   economy  = cheapest of them
+ *   standard = median of them, using direct flights when there are enough
+ */
+function summarize(list, depart, ret) {
+    const want = { dep: Date.parse(depart), len: (Date.parse(ret) - Date.parse(depart)) / DAY };
+    const all = list.filter(x => typeof x.price === 'number' && x.departure_at && x.return_at)
+        .map(x => {
+            const dep = Date.parse(x.departure_at.slice(0, 10));
+            const len = (Date.parse(x.return_at.slice(0, 10)) - dep) / DAY;
+            return { x, dDep: Math.abs(dep - want.dep) / DAY, dLen: Math.abs(len - want.len) };
+        });
+    const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4, () => true];
+    let pool = [];
+    for (const ok of tiers) {
+        pool = all.filter(ok).map(f => f.x);
+        if (pool.length) break;
+    }
+    if (!pool.length) return null;
+
+    pool.sort((a, b) => a.price - b.price);
+    const direct = pool.filter(f => f.transfers === 0 && f.return_transfers === 0);
+    const base = direct.length >= 2 ? direct : pool;
+    const median = base[Math.floor((base.length - 1) / 2)];
+    return { economy: fare(pool[0]), standard: fare(median), fares: pool.length };
 }
 
 export async function onRequestGet(context) {
@@ -74,26 +85,17 @@ export async function onRequestGet(context) {
 
     return cached(context, TTL, async () => {
         try {
-            const base = { origin, destination };
+            // One request returns up to 100 fares (direct and with stops)
             let match = 'exact';
-            let [any, direct] = await Promise.all([
-                query(env, { ...base, departure_at: depart, return_at: ret, direct: 'false' }),
-                query(env, { ...base, departure_at: depart, return_at: ret, direct: 'true' })
-            ]);
-            if (!any.length) {
+            let list = await query(env, { origin, destination, departure_at: depart, return_at: ret });
+            if (!list.length) {
                 match = 'month';
-                [any, direct] = await Promise.all([
-                    query(env, { ...base, departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7), direct: 'false' }),
-                    query(env, { ...base, departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7), direct: 'true' })
-                ]);
+                list = await query(env, { origin, destination,
+                    departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
             }
-            const economy = pick(any, depart, ret);
-            if (!economy) return { found: false };
-            let directFare = pick(direct, depart, ret);
-            // the cheapest fare may itself be non-stop both ways
-            if (economy.transfers === 0 && economy.returnTransfers === 0 &&
-                (!directFare || economy.price <= directFare.price)) directFare = economy;
-            return { found: true, match, currency: 'USD', economy, direct: directFare,
+            const result = summarize(list, depart, ret);
+            if (!result) return { found: false };
+            return { found: true, match, currency: 'USD', ...result,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
             return { error: e.message };
