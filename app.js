@@ -1,101 +1,239 @@
 // ============================================================================
 // Module: app.js
-// Purpose: Manages UI events, date calculations, and application flow.
+// Purpose: Form wiring, date rules, traveler rules, validation and summary.
 // ============================================================================
 
-/**
- * Initializes the application state once the DOM content is fully loaded.
- * Sets the minimum selectable start date to today.
- */
+const MIN_TRAVELERS = 1;
+const MAX_TRAVELERS = 20;
+
+const els = {};
+let autocomplete = {};
+
 document.addEventListener('DOMContentLoaded', () => {
-    const startDateInput = document.getElementById('startDate');
-    startDateInput.setAttribute('min', new Date().toISOString().split('T')[0]);
+    ['tripForm', 'startDate', 'endDate', 'passengers', 'summaryDisplay',
+     'formError', 'swapBtn', 'year'].forEach(id => { els[id] = document.getElementById(id); });
+
+    autocomplete.origin = setupAutocomplete('origin');
+    autocomplete.destination = setupAutocomplete('destination');
+
+    els.year.textContent = new Date().getFullYear();
+    els.startDate.min = toISODate(new Date());
+    updateMinEndDate();
+
+    els.startDate.addEventListener('change', () => { updateMinEndDate(); updateRouteSummary(); });
+    els.endDate.addEventListener('change', updateRouteSummary);
+    els.swapBtn.addEventListener('click', swapCities);
+    els.tripForm.addEventListener('submit', submitTrip);
+    document.addEventListener('trip:change', updateRouteSummary);
+
+    setupTravelersInput();
+    updateRouteSummary();
 });
 
+/* ---------------------------------------------------------------- Dates -- */
+
 /**
- * Updates the minimum allowed end date based on the selected start date.
+ * Formats a Date as YYYY-MM-DD in the user's LOCAL time zone.
+ * (toISOString() uses UTC, which shows the wrong day around midnight.)
+ */
+function toISODate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+/** Adds days to a YYYY-MM-DD string and returns a new YYYY-MM-DD string. */
+function addDays(isoDate, days) {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    return toISODate(new Date(y, m - 1, d + days));
+}
+
+/** Whole nights between two YYYY-MM-DD strings (DST-safe). */
+function nightsBetween(startIso, endIso) {
+    const toUtc = s => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+    return Math.round((toUtc(endIso) - toUtc(startIso)) / 86400000);
+}
+
+/** Human-friendly date, e.g. "Sat, 10 Oct 2026". */
+function formatDate(isoDate) {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+    });
+}
+
+/**
+ * Keeps the return date at least one day after departure.
  */
 function updateMinEndDate() {
-    const startVal = document.getElementById('startDate').value;
-    const endDateInput = document.getElementById('endDate');
+    const startVal = els.startDate.value;
+    els.endDate.min = addDays(startVal || els.startDate.min, 1);
 
-    if (!startVal) {
-        endDateInput.min = "";
-        return;
+    if (els.endDate.value && els.endDate.value < els.endDate.min) {
+        els.endDate.value = '';
     }
+}
 
-    const minEnd = new Date(startVal);
-    minEnd.setDate(minEnd.getDate() + 1);
-    endDateInput.min = minEnd.toISOString().split('T')[0];
+/* ------------------------------------------------------------ Travelers -- */
 
-    if (endDateInput.value && endDateInput.value <= startVal) {
-        endDateInput.value = '';
-    }
+/**
+ * Travelers: digits only, 1–20, freely editable (can be cleared while typing),
+ * falls back to 1 when left empty. Covers typing, pasting and the numpad.
+ */
+function setupTravelersInput() {
+    const input = els.passengers;
+
+    input.addEventListener('input', () => {
+        const digits = input.value.replace(/\D/g, '').slice(0, 2);
+        if (digits !== input.value) input.value = digits;
+        if (digits && Number(digits) > MAX_TRAVELERS) input.value = String(MAX_TRAVELERS);
+        updateRouteSummary();
+    });
+
+    input.addEventListener('blur', () => {
+        input.value = String(getTravelers());
+        updateRouteSummary();
+    });
+
+    document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            input.value = String(clampTravelers(getTravelers() + Number(btn.dataset.step)));
+            updateRouteSummary();
+        });
+    });
+}
+
+function clampTravelers(n) {
+    return Math.min(MAX_TRAVELERS, Math.max(MIN_TRAVELERS, n));
+}
+
+function getTravelers() {
+    const n = parseInt(els.passengers.value, 10);
+    return Number.isNaN(n) ? MIN_TRAVELERS : clampTravelers(n);
+}
+
+/* ---------------------------------------------------------------- Route -- */
+
+function swapCities() {
+    const { origin, destination } = tripData;
+    const originText = autocomplete.origin.input.value;
+    const destText = autocomplete.destination.input.value;
+
+    tripData.origin = destination;
+    tripData.destination = origin;
+    autocomplete.origin.input.value = destText;
+    autocomplete.destination.input.value = originText;
     updateRouteSummary();
 }
 
+/* -------------------------------------------------------------- Summary -- */
+
 /**
- * Calculates and displays the trip duration, passenger count, and summary.
+ * Renders the live trip summary card below the form.
  */
 function updateRouteSummary() {
-    const startVal = document.getElementById('startDate').value;
-    const endVal = document.getElementById('endDate').value;
-    const passInput = document.getElementById('passengers').value;
-    const display = document.getElementById('summaryDisplay');
+    const { origin, destination } = tripData;
+    const start = els.startDate.value;
+    const end = els.endDate.value;
+    const travelers = getTravelers();
+    const box = els.summaryDisplay;
 
-    let lines = [];
-    
-    // Display the selected route if both origin and destination are available
-    if (tripData.origin && tripData.destination) {
-        lines.push(`Route: ${tripData.origin} ➔ ${tripData.destination}`);
+    if (!origin && !destination && !start && !end) {
+        box.hidden = true;
+        return;
     }
 
-    // Calculate and format travel dates and total duration
-    if (startVal && endVal) {
-        lines.push(`Dates: ${startVal} to ${endVal}`);
-        const start = new Date(startVal);
-        const end = new Date(endVal);
-        const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
-        lines.push(`Duration: ${diffDays} nights, ${diffDays + 1} days`);
+    const rows = [];
+    if (origin || destination) {
+        const from = origin ? `${origin.n} (${origin.a[0]})` : '—';
+        const to = destination ? `${destination.n} (${destination.a[0]})` : '—';
+        rows.push(['Route', `${from} → ${to}`]);
     }
+    if (start && end) {
+        const nights = nightsBetween(start, end);
+        rows.push(['Dates', `${formatDate(start)} – ${formatDate(end)}`]);
+        rows.push(['Duration', `${nights} night${nights === 1 ? '' : 's'}, ${nights + 1} days`]);
+    } else if (start) {
+        rows.push(['Departure', formatDate(start)]);
+    }
+    rows.push(['Travelers', `${travelers} ${travelers === 1 ? 'person' : 'people'}`]);
 
-    // Display passenger count, defaulting to 1 if empty or invalid
-    const pass = passInput === '' ? 1 : Math.max(1, Math.floor(passInput));
-    lines.push(`Travelers: ${pass}`);
+    box.innerHTML = '';
+    const title = document.createElement('h2');
+    title.textContent = 'Your trip';
+    const dl = document.createElement('dl');
+    rows.forEach(([label, value]) => {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = value;
+        dl.append(dt, dd);
+    });
+    box.append(title, dl);
+    box.hidden = false;
+}
 
-    display.innerHTML = lines.join('<br>');
+/* ----------------------------------------------------------- Submission -- */
+
+function showError(message, fieldIds = []) {
+    els.formError.textContent = message;
+    els.formError.hidden = false;
+    fieldIds.forEach(id => document.getElementById(id).classList.add('invalid'));
+    if (fieldIds[0]) document.getElementById(fieldIds[0]).focus();
+}
+
+function clearErrors() {
+    els.formError.hidden = true;
+    document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
 }
 
 /**
- * Handles the final submission of the travel route with strict validation.
+ * Validates the form and, when everything is fine, shows the next step.
  */
-function submitTrip() {
-    const start = document.getElementById('startDate').value;
-    const end = document.getElementById('endDate').value;
-    const passInput = document.getElementById('passengers').value;
-    const pass = passInput === '' ? 1 : Math.floor(passInput);
+function submitTrip(event) {
+    event.preventDefault();
+    clearErrors();
 
-    /* 1. Validate if essential fields are empty */
-    if (!tripData.origin || !tripData.destination || !start || !end) {
-        alert("Please fill in Origin, Destination, and all required dates.");
+    const { origin, destination } = tripData;
+    const start = els.startDate.value;
+    const end = els.endDate.value;
+
+    const missing = [];
+    if (!origin) missing.push('origin');
+    if (!destination) missing.push('destination');
+    if (!start) missing.push('startDate');
+    if (!end) missing.push('endDate');
+    if (missing.length) {
+        const cityTyped = (!origin && autocomplete.origin.input.value.trim()) ||
+                          (!destination && autocomplete.destination.input.value.trim());
+        showError(cityTyped
+            ? 'Please pick your cities from the suggestion list.'
+            : 'Please fill in origin, destination and both dates.', missing);
         return;
     }
 
-    /* 2. Validate passengers count (must be at least 1) */
-    if (pass < 1) {
-        alert("Enter a valid number of travelers (at least 1).");
+    if (origin === destination || (origin.n === destination.n && origin.cc === destination.cc)) {
+        showError('Origin and destination cannot be the same. Please choose different cities.',
+                  ['destination']);
         return;
     }
 
-    /* 3. Logical validation: Origin and Destination must be different */
-    if (tripData.origin === tripData.destination) {
-        alert("Origin and Destination cannot be the same. Please choose different locations.");
+    if (start < els.startDate.min) {
+        showError('Departure date cannot be in the past.', ['startDate']);
+        return;
+    }
+    if (end <= start) {
+        showError('Return date must be at least one day after departure.', ['endDate']);
         return;
     }
 
-    // Display trip confirmation details
-    alert(`Route: ${tripData.origin} ➔ ${tripData.destination}\n` +
-          `Dates: ${start} to ${end}\n` +
-          `Travelers: ${pass}\n\n` +
-          `WayBudget budget planner is coming soon!`);
+    els.passengers.value = String(getTravelers());
+    updateRouteSummary();
+
+    const note = document.createElement('p');
+    note.className = 'coming-soon';
+    note.textContent = 'Budget estimate is coming soon — flights, stay, food, transfers and sights in one total.';
+    els.summaryDisplay.appendChild(note);
+    els.summaryDisplay.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

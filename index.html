@@ -4,47 +4,78 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WayBudget - Route Budget Planner</title>
-    
+    <meta name="description" content="Estimate the full cost of your trip: flights, accommodation, food, transfers and attractions.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2a541'/%3E%3Ctext x='16' y='23' font-family='Arial' font-weight='800' font-size='19' text-anchor='middle' fill='%230f2430'%3EW%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div class="container">
-        <h1>WayBudget</h1>
-        
-        <div class="input-group">
-            <label for="origin">From:</label>
-            <input type="text" id="origin" placeholder="Departure..." oninput="filterCities(this.value, 'origin')">
-            <ul id="originResults" class="city-results"></ul>
+    <header class="hero">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true">W</span>
+            <span class="brand-name">WayBudget</span>
         </div>
+        <h1>How much will your trip really cost?</h1>
+        <p class="tagline">Flights, stay, food, transfers and sights &mdash; one total, from door to door.</p>
+    </header>
 
-        <div class="input-group">
-            <label for="destination">To:</label>
-            <input type="text" id="destination" placeholder="Arrival..." oninput="filterCities(this.value, 'destination')">
-            <ul id="destinationResults" class="city-results"></ul>
-        </div>
+    <main class="container">
+        <form id="tripForm" class="card" novalidate autocomplete="off">
+            <div class="route-row">
+                <div class="field city-field">
+                    <label for="origin">From</label>
+                    <input type="text" id="origin" placeholder="City or airport"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false"
+                           aria-controls="originResults" spellcheck="false">
+                    <ul id="originResults" class="city-results" role="listbox"></ul>
+                </div>
 
-        <div class="input-group">
-            <label for="startDate">Start:</label>
-            <input type="date" id="startDate" onchange="updateMinEndDate(); updateRouteSummary();">
-        </div>
+                <button type="button" id="swapBtn" class="swap-btn" aria-label="Swap origin and destination" title="Swap">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
 
-        <div class="input-group">
-            <label for="endDate">End:</label>
-            <input type="date" id="endDate" onchange="updateRouteSummary()">
-        </div>
+                <div class="field city-field">
+                    <label for="destination">To</label>
+                    <input type="text" id="destination" placeholder="City or airport"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false"
+                           aria-controls="destinationResults" spellcheck="false">
+                    <ul id="destinationResults" class="city-results" role="listbox"></ul>
+                </div>
+            </div>
 
-        <div class="input-group">
-            <label for="passengers">Travelers:</label>
-            <input type="number" id="passengers" min="1" value="1" 
-                   onkeydown="return event.keyCode !== 189 && event.keyCode !== 187 && event.keyCode !== 69" 
-                   oninput="updateRouteSummary()">
-        </div>
+            <div class="detail-row">
+                <div class="field">
+                    <label for="startDate">Departure</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="field">
+                    <label for="endDate">Return</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="field travelers-field">
+                    <label for="passengers">Travelers</label>
+                    <div class="stepper">
+                        <button type="button" class="step-btn" data-step="-1" aria-label="Fewer travelers">&minus;</button>
+                        <input type="text" id="passengers" value="1" inputmode="numeric" maxlength="2" aria-describedby="travelersHint">
+                        <button type="button" class="step-btn" data-step="1" aria-label="More travelers">+</button>
+                    </div>
+                </div>
+            </div>
+            <p id="travelersHint" class="sr-only">Between 1 and 20 travelers.</p>
 
-        <button type="button" onclick="submitTrip()">Plan My Route</button>
+            <p id="formError" class="form-error" role="alert" hidden></p>
 
-        <div id="summaryDisplay"></div>
-    </div>
+            <button type="submit" class="primary-btn">Plan My Route</button>
+        </form>
+
+        <section id="summaryDisplay" class="summary" aria-live="polite" hidden></section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; <span id="year"></span> WayBudget. Airport data: <a href="https://ourairports.com/" rel="noopener">OurAirports</a>, city data: <a href="https://www.geonames.org/" rel="noopener">GeoNames</a> (CC BY 4.0).</p>
+    </footer>
 
     <script src="search.js"></script>
     <script src="app.js"></script>

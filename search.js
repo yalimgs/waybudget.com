@@ -1,80 +1,191 @@
 // ============================================================================
 // Module: search.js
-// Purpose: Handles data fetching, city search logic, and text normalization.
+// Purpose: Loads the city/airport dataset and powers the autocomplete fields.
+// Data: data/cities.json, built by tools/build_cities.py. Each entry:
+//   { n: city, c: country, cc: ISO code, lat, lon,
+//     a: [IATA codes, main first], an: [airport names], k: keywords, l: 1 if large airport }
 // ============================================================================
 
-/* Global data store and trip state */
-let allData = [];
-let tripData = { origin: "", destination: "" };
+/* Selected cities (full objects, or null when nothing valid is selected) */
+const tripData = { origin: null, destination: null };
 
-/* Load geographical data from the local JSON file */
-fetch('countries+cities.json')
-    .then(res => res.json())
-    .then(data => { allData = data; })
-    .catch(err => console.error('Data loading error:', err));
+let allCities = [];
+const MAX_RESULTS = 8;
+
+/* Load the dataset once; searching waits for this promise */
+const citiesReady = fetch('data/cities.json')
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        allCities = data.map(city => ({
+            ...city,
+            label: `${city.n}, ${city.c}`,
+            nameNorm: normalizeText(city.n),
+            words: normalizeText([city.n, city.c, city.k, ...city.an].join(' ')).split(/[\s\-\/']+/),
+            codes: city.a.map(code => code.toLowerCase()),
+            keywords: normalizeText(city.k).split(' ').filter(Boolean)
+        }));
+    })
+    .catch(err => console.error('City data could not be loaded:', err));
 
 /**
- * Normalizes text to handle case sensitivity and special character variations.
- * Standardizes characters to their base form for consistent searching.
+ * Lowercases and strips accents so "İzmir", "izmir" and "IZMIR" all match.
  */
 function normalizeText(text) {
-    return text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-        .replace(/ı/g, 'i').replace(/i̇/g, 'i');
+    return (text || '')
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+        .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase().trim();
 }
 
 /**
- * Filters and displays city matches based on user input.
- * Implements token-based matching for better search accuracy.
+ * Returns the best-matching cities for a query, highest score first.
  */
-function filterCities(val, type) {
-    const results = document.getElementById(type + 'Results');
+function searchCities(query) {
+    const q = normalizeText(query).replace(/[,()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (q.length < 2) return [];
+    const tokens = q.split(' ');
 
-    /* Clear trip data and hide results if the input is empty */
-    if (val.trim() === "") {
-        tripData[type] = "";
-        results.style.display = 'none';
-        updateRouteSummary();
-        return;
+    const matches = [];
+    for (const city of allCities) {
+        let score = 0;
+
+        if (city.codes.includes(q)) score = 1000;                        // "ist"
+        else if (city.nameNorm === q) score = 900;                       // "paris"
+        else if (city.keywords.includes(q)) score = 800;                 // "bali" -> Denpasar
+        else if (city.nameNorm.startsWith(q)) score = 700;               // "pari"
+        else if (tokens.every(t => city.words.some(w => w.startsWith(t)))) {
+            // every typed word starts a word in city/country/airport names
+            score = city.words.slice(0, 3).some(w => w.startsWith(tokens[0])) ? 400 : 200;
+        }
+        if (!score) continue;
+
+        if (city.l) score += 50;                                         // big hubs first
+        score += Math.min(city.a.length, 4) * 5;                         // multi-airport cities
+        matches.push({ city, score });
     }
 
-    results.innerHTML = '';
-    if (val.length < 2) { results.style.display = 'none'; return; }
+    matches.sort((a, b) => b.score - a.score || a.city.n.localeCompare(b.city.n));
+    return matches.slice(0, MAX_RESULTS).map(m => m.city);
+}
 
-    /* Parse search input into tokens for flexible matching */
-    const queryTokens = normalizeText(val).replace(/,/g, ' ').split(' ').filter(t => t.length > 0);
-    let matches = [];
+/**
+ * Wires one text input + results list into an accessible autocomplete.
+ * type is 'origin' or 'destination'.
+ */
+function setupAutocomplete(type) {
+    const input = document.getElementById(type);
+    const list = document.getElementById(type + 'Results');
+    let results = [];
+    let activeIndex = -1;
 
-    /* Search through the data store for matching city-country combinations */
-    allData.forEach(country => {
-        country.cities.forEach(city => {
-            const fullString = normalizeText(`${city} ${country.name}`);
-            const isMatch = queryTokens.every(t => fullString.includes(t));
+    function close() {
+        list.classList.remove('open');
+        list.innerHTML = '';
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        activeIndex = -1;
+    }
 
-            if (isMatch) {
-                let score = normalizeText(city).startsWith(queryTokens[0]) ? 100 : 50;
-                matches.push({ name: `${city}, ${country.name}`, score: score });
-            }
+    function select(city) {
+        tripData[type] = city;
+        input.value = city.label;
+        input.classList.remove('invalid');
+        close();
+        document.dispatchEvent(new CustomEvent('trip:change'));
+    }
+
+    function highlight(index) {
+        const items = list.querySelectorAll('li');
+        items.forEach(li => li.classList.remove('active'));
+        activeIndex = index;
+        if (index >= 0 && items[index]) {
+            items[index].classList.add('active');
+            items[index].scrollIntoView({ block: 'nearest' });
+            input.setAttribute('aria-activedescendant', items[index].id);
+        }
+    }
+
+    function render() {
+        list.innerHTML = '';
+        if (!results.length) {
+            const empty = document.createElement('li');
+            empty.className = 'empty';
+            empty.textContent = 'No airport city found';
+            list.appendChild(empty);
+        }
+        results.forEach((city, i) => {
+            const li = document.createElement('li');
+            li.id = `${type}-opt-${i}`;
+            li.setAttribute('role', 'option');
+
+            const main = document.createElement('span');
+            main.className = 'opt-main';
+            const name = document.createElement('strong');
+            name.textContent = city.n;
+            const country = document.createElement('span');
+            country.className = 'opt-country';
+            country.textContent = city.c;
+            main.append(name, country);
+
+            const codes = document.createElement('span');
+            codes.className = 'opt-codes';
+            codes.textContent = city.a.slice(0, 3).join(' · ') + (city.a.length > 3 ? ' …' : '');
+
+            li.append(main, codes);
+            // mousedown fires before the input's blur, so the click is not lost
+            li.addEventListener('mousedown', e => { e.preventDefault(); select(city); });
+            list.appendChild(li);
         });
+        list.classList.add('open');
+        input.setAttribute('aria-expanded', 'true');
+        highlight(results.length ? 0 : -1);
+    }
+
+    input.addEventListener('input', async () => {
+        // Any edit invalidates the previous selection (fixes stale city bug)
+        if (tripData[type]) {
+            tripData[type] = null;
+            document.dispatchEvent(new CustomEvent('trip:change'));
+        }
+        const value = input.value;
+        if (normalizeText(value).length < 2) { close(); return; }
+        await citiesReady;
+        if (input.value !== value) return;   // user kept typing meanwhile
+        results = searchCities(value);
+        render();
     });
 
-    /* Rank matches based on the scoring system */
-    matches.sort((a, b) => b.score - a.score);
+    input.addEventListener('keydown', e => {
+        const isOpen = list.classList.contains('open');
+        if (e.key === 'ArrowDown' && isOpen) {
+            e.preventDefault();
+            highlight(Math.min(activeIndex + 1, results.length - 1));
+        } else if (e.key === 'ArrowUp' && isOpen) {
+            e.preventDefault();
+            highlight(Math.max(activeIndex - 1, 0));
+        } else if (e.key === 'Enter' && isOpen && activeIndex >= 0) {
+            e.preventDefault();
+            select(results[activeIndex]);
+        } else if (e.key === 'Escape') {
+            close();
+        } else if (e.key === 'Tab' && isOpen && activeIndex >= 0) {
+            select(results[activeIndex]);
+        }
+    });
 
-    /* Render matching list items to the DOM */
-    if (matches.length > 0) {
-        results.style.display = 'block';
-        matches.slice(0, 8).forEach(item => {
-            const li = document.createElement('li');
-            li.textContent = item.name;
-            li.onclick = () => {
-                document.getElementById(type).value = item.name;
-                tripData[type] = item.name;
-                results.style.display = 'none';
-                updateRouteSummary();
-            };
-            results.appendChild(li);
-        });
-    } else {
-        results.style.display = 'none';
-    }
+    input.addEventListener('blur', () => {
+        // Accept an exact typed match without needing a click
+        if (!tripData[type] && input.value.trim()) {
+            const exact = searchCities(input.value)
+                .find(c => normalizeText(c.label) === normalizeText(input.value) ||
+                           c.nameNorm === normalizeText(input.value));
+            if (exact) select(exact);
+        }
+        close();
+    });
+
+    return { select, input };
 }
