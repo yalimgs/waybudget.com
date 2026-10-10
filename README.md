@@ -31,6 +31,13 @@ currently flights and hotels).
 Plain HTML/CSS/JS, no build step. To run locally: `python -m http.server` in this
 folder, then open http://localhost:8000 (opening `index.html` directly won't load the JSON).
 
+## Deploying
+
+Push to `main`; Cloudflare Pages deploys automatically (`functions/` becomes the API).
+Before committing CSS/JS changes run `python3 tools/bump_version.py` — it stamps
+`?v=<hash>` on the CSS/JS links in `index.html` so browsers fetch the new files
+instead of serving cached copies (Cloudflare lets browsers cache CSS/JS for 4 hours).
+
 ## Rebuilding the city data
 
 ```
