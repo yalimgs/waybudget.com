@@ -15,28 +15,32 @@
 
 const BUDGET_MODEL = {
     // Choices offered per line item (first = cheapest). Labels are shown in the UI.
+    // Choices offered per line item: [key, label, short hint]. Flights and
+    // hotels show the hint and each option's price on the button.
     options: {
-        flights:  [['budget', 'Cheapest'], ['standard', 'Standard'], ['comfort', 'Flexible']],
-        hotel:    [['budget', 'Hostel / 2★'], ['standard', '3★'], ['comfort', '4–5★']],
-        food:     [['budget', 'Street food'], ['standard', 'Casual'], ['comfort', 'Fine dining']],
-        transfer: [['transit', 'Train / bus'], ['taxi', 'Taxi'], ['private', 'Private']],
+        flights:  [['economy', 'Economy', 'Lowest fare'], ['standard', 'Standard', 'Direct flight'],
+                   ['premium', 'Premium', 'Business class']],
+        hotel:    [['budget', 'Budget', 'Good value'], ['standard', 'Standard', 'Well-rated'],
+                   ['luxury', 'Luxury', 'Top-end hotels']],
+        food:     [['budget', 'Street food'], ['standard', 'Casual'], ['luxury', 'Fine dining']],
+        transfer: [['transit', 'Public'], ['taxi', 'Taxi'], ['private', 'Private']],
         local:    [['public', 'Public'], ['mixed', 'Mixed'], ['taxi', 'Taxi']]
     },
-    // Quick presets for the Budget / Standard / Comfort tabs
+    // Quick presets for the Budget / Standard / Luxury tabs
     presets: {
-        budget:   { flights: 'budget', hotel: 'budget', food: 'budget', transfer: 'transit', local: 'public' },
+        budget:   { flights: 'economy', hotel: 'budget', food: 'budget', transfer: 'transit', local: 'public' },
         standard: { flights: 'standard', hotel: 'standard', food: 'standard', transfer: 'taxi', local: 'mixed' },
-        comfort:  { flights: 'comfort', hotel: 'comfort', food: 'comfort', transfer: 'private', local: 'taxi' }
+        luxury:   { flights: 'premium', hotel: 'luxury', food: 'luxury', transfer: 'private', local: 'taxi' }
     },
 
     // Hotel: price per room per night (US base), 2 travelers per room
-    hotelNight:   { budget: 90, standard: 170, comfort: 300 },
+    hotelNight:   { budget: 90, standard: 170, luxury: 380 },
     hotelExp: 0.7,
     peoplePerRoom: 2,
     bigCityHotelFactor: 1.2,          // cities with a major airport
 
     // Food: per person per day (US base): breakfast, lunch, dinner, drinks/snacks
-    foodDay:      { budget: 35, standard: 70, comfort: 130 },
+    foodDay:      { budget: 35, standard: 70, luxury: 130 },
     foodExp: 0.75,
     bigCityFoodFactor: 1.1,
 
@@ -54,7 +58,10 @@ const BUDGET_MODEL = {
 
     // Flight fallback: economy round trip per person by great-circle distance
     flight: { base: 80, shortPerKm: 0.09, longFrom: 3000, longPerKm: 0.065 },
-    flightTierFactor: { budget: 0.85, standard: 1, comfort: 1.35 },
+    // Economy = cheapest (often with stops), Standard = direct economy,
+    // Premium = business class (multiple of economy, larger on long haul)
+    flightFactor: { economy: 0.85, standard: 1 },
+    businessFactor: [[1500, 2.5], [4000, 3], [Infinity, 4]],   // [up to km, × standard fare]
 
     defaultLevel: 0.5                 // countries with no price data
 };
@@ -102,7 +109,11 @@ function estimateFlightPerPerson(km, tier) {
     const fare = km <= f.longFrom
         ? f.base + km * f.shortPerKm
         : f.base + f.longFrom * f.shortPerKm + (km - f.longFrom) * f.longPerKm;
-    return fare * BUDGET_MODEL.flightTierFactor[tier];
+    if (tier === 'premium') {
+        const [, factor] = BUDGET_MODEL.businessFactor.find(([maxKm]) => km <= maxKm);
+        return fare * factor;
+    }
+    return fare * BUDGET_MODEL.flightFactor[tier];
 }
 
 /**
@@ -193,6 +204,13 @@ function calculateBudget(trip, choices, live = {}) {
         amount: localDay * travelers * days, kind: 'estimate',
         source: 'Metro, bus, tram and short rides while sightseeing'
     });
+
+    // Unit price of every option, for the flight/hotel buttons
+    items.find(i => i.key === 'flights').optionPrices = live.flights ? null : Object.fromEntries(
+        M.options.flights.map(([k]) => [k, money(estimateFlightPerPerson(km, k)) + ' pp']));
+    items.find(i => i.key === 'hotel').optionPrices = live.hotel ? null : Object.fromEntries(
+        M.options.hotel.map(([k]) => [k, money(M.hotelNight[k] * level ** M.hotelExp *
+            (big ? M.bigCityHotelFactor : 1)) + '/night']));
 
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     return { items, total, perPerson: total / travelers };
