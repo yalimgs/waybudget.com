@@ -79,7 +79,7 @@ export async function onRequestGet(context) {
         try {
             const r = await fetchRates(env, p);
             const info = new Map((r.hotels || []).map(h => [h.id, h]));
-            const list = [];
+            let list = [];
             for (const entry of r.data || []) {
                 const total = offerTotal(entry);
                 if (!total) continue;
@@ -97,6 +97,11 @@ export async function onRequestGet(context) {
             const byPrice = arr => arr.slice().sort((a, b) => a.perNight - b.perNight);
             const minOf = arr => byPrice(arr)[0];
             const medianOf = arr => byPrice(arr)[Math.floor((arr.length - 1) / 2)];
+
+            // Not hotels: campsites, caravan parks
+            const NOT_HOTEL = /camping|campsite|campground|caravan|glamping|\bcamp\b/i;
+            list = list.filter(h => !NOT_HOTEL.test(h.name || ''));
+            if (list.length < 3) return { found: false, count: list.length };
 
             // Budget: the cheapest hotel that is still decent (7+/10, 20+ reviews)
             const decent = list.filter(h => h.rating >= 7 && h.reviews >= 20);
@@ -117,7 +122,13 @@ export async function onRequestGet(context) {
                 list.filter(h => h.stars >= 4 && h.rating >= 9),
                 list.filter(h => h.stars >= 4 && h.rating >= 8.5)
             ].find(arr => arr.length);
-            const luxuryHotel = lux ? minOf(lux) : byPrice(list)[Math.round((list.length - 1) * 0.8)];
+            // ...that is clearly above the typical pick (some "5★" are cheap)
+            const floor = standardHotel.perNight * 1.15;
+            const luxAbove = lux ? lux.filter(h => h.perNight >= floor) : [];
+            const pricier = byPrice(list).filter(h => h.perNight >= floor);
+            const luxuryHotel = luxAbove.length ? minOf(luxAbove)
+                : pricier.length ? pricier[Math.floor((pricier.length - 1) / 2)]
+                : byPrice(list)[list.length - 1];
 
             const tier = h => ({ perNight: h.perNight,
                                  example: h.name ? { name: h.name, stars: h.stars, rating: h.rating } : null });

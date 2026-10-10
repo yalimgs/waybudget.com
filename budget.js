@@ -284,7 +284,7 @@ function fetchFlights(trip) {
 
 function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
-                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=2`);
+                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=3`);
 }
 
 /* ------------------------------------------------------------- Currency -- */
