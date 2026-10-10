@@ -143,10 +143,14 @@ function calculateBudget(trip, choices, live = {}) {
             info = describeFare(fl.economy);
             source = `Lowest of ${fl.fares} ${source.toLowerCase()}`;
         } else if (choices.flights === 'standard') {
-            if (fl.standard) {
+            if (fl.standard && !fl.standard.derived) {
                 perPerson = fl.standard.price;
                 info = describeFare(fl.standard);
                 source = `Typical (median) of ${fl.fares} ${source.toLowerCase()}`;
+            } else if (fl.standard) {
+                perPerson = fl.standard.price;
+                kind = 'estimate'; info = 'Typical fare';
+                source = 'Lowest live fare + typical markup seen on this route';
             } else {
                 perPerson = fl.economy.price * M.standardFallbackFactor;
                 kind = 'estimate'; info = 'Typical fare';
@@ -262,7 +266,7 @@ async function fetchLivePrices(trip, startIso, endIso) {
     const { origin, destination, travelers } = trip;
     const get = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
     const flightsUrl = `/api/flights?origin=${origin.a[0]}&destination=${destination.a[0]}` +
-                       `&depart=${startIso}&return=${endIso}&v=3`;
+                       `&depart=${startIso}&return=${endIso}&v=4`;
     const hotelsUrl = `/api/hotels?lat=${destination.lat}&lon=${destination.lon}` +
                       `&checkin=${startIso}&checkout=${endIso}&adults=${Math.min(2, travelers)}`;
     const [flights, hotel] = await Promise.all([get(flightsUrl), get(hotelsUrl)]);

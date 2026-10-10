@@ -63,18 +63,30 @@ function summarize(list, depart, ret) {
     const closest = pools.find(p => p.length);
     if (!closest) return null;
 
-    // Standard: median needs a sample, so widen the date window until there
-    // are at least 5 fares; with fewer than 3 fares overall it is left out
-    // (the page then estimates it from Economy).
-    const sample = pools.find(p => p.length >= 5) || pools[pools.length - 1];
-    let standard = null;
-    if (sample.length >= 3) {
-        const direct = sample.filter(f => f.transfers === 0 && f.return_transfers === 0);
-        const base = direct.length >= 3 ? direct : sample;
-        standard = base[Math.floor((base.length - 1) / 2)];
-        if (standard.price < closest[0].price) standard = closest[0];
+    const median = arr => {
+        const direct = arr.filter(f => f.transfers === 0 && f.return_transfers === 0);
+        const base = direct.length >= 3 ? direct : arr;
+        return base[Math.floor((base.length - 1) / 2)];
+    };
+    const economy = closest[0];
+
+    // Standard = typical fare. Enough fares near the dates: their median.
+    if (closest.length >= 3) {
+        const m = median(closest);
+        if (m.price > economy.price) {
+            return { economy: fare(economy), standard: fare(m), fares: closest.length };
+        }
     }
-    return { economy: fare(closest[0]), standard: standard && fare(standard), fares: sample.length };
+    // Otherwise learn how much a typical fare costs over the cheapest one on
+    // this route (from a wider date window) and apply that to Economy.
+    const sample = pools.find(p => p.length >= 5) || pools[pools.length - 1];
+    const ratio = sample.length >= 3 ? median(sample).price / sample[0].price : 0;
+    const factor = Math.min(2, Math.max(1.15, ratio || 1.25));
+    return {
+        economy: fare(economy),
+        standard: { price: Math.round(economy.price * factor), derived: true },
+        fares: sample.length
+    };
 }
 
 export async function onRequestGet(context) {
