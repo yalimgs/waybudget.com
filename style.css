@@ -368,17 +368,7 @@ input.invalid {
     white-space: nowrap;
 }
 .item-choices button:hover { color: var(--ink); }
-.item-choices button > span { display: block; }
-.item-choices.rich {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: min(100%, 420px);
-}
-.item-choices.rich button { padding: 7px 8px; text-align: center; white-space: normal; }
-.choice-name { font-size: 13px; font-weight: 700; }
-.choice-hint { font-size: 11px; font-weight: 500; color: var(--muted); }
-.choice-price { margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.item-choices button[aria-pressed="true"] .choice-price { color: var(--brand); }
+
 .item-choices button[aria-pressed="true"] {
     background: #fff;
     color: var(--brand);
@@ -453,5 +443,4 @@ input.invalid {
     .budget-item { grid-template-columns: 32px 1fr auto; gap: 10px; }
     .item-icon { width: 32px; height: 32px; font-size: 16px; }
     .item-choices button { padding: 5px 9px; }
-    .item-choices.rich { width: 100%; }
 }

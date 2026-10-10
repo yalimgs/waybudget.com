@@ -14,14 +14,10 @@
 // ============================================================================
 
 const BUDGET_MODEL = {
-    // Choices offered per line item (first = cheapest). Labels are shown in the UI.
-    // Choices offered per line item: [key, label, short hint]. Flights and
-    // hotels show the hint and each option's price on the button.
+    // Choices offered per line item: [key, label]
     options: {
-        flights:  [['economy', 'Economy', 'Lowest fare'], ['standard', 'Standard', 'Direct flight'],
-                   ['premium', 'Premium', 'Business class']],
-        hotel:    [['budget', 'Budget', 'Good value'], ['standard', 'Standard', 'Well-rated'],
-                   ['luxury', 'Luxury', 'Top-end hotels']],
+        flights:  [['economy', 'Economy'], ['standard', 'Standard'], ['premium', 'Premium']],
+        hotel:    [['budget', 'Budget'], ['standard', 'Standard'], ['luxury', 'Luxury']],
         food:     [['budget', 'Street food'], ['standard', 'Casual'], ['luxury', 'Fine dining']],
         transfer: [['transit', 'Public'], ['taxi', 'Taxi'], ['private', 'Private']],
         local:    [['public', 'Public'], ['mixed', 'Mixed'], ['taxi', 'Taxi']]
@@ -204,13 +200,6 @@ function calculateBudget(trip, choices, live = {}) {
         amount: localDay * travelers * days, kind: 'estimate',
         source: 'Metro, bus, tram and short rides while sightseeing'
     });
-
-    // Unit price of every option, for the flight/hotel buttons
-    items.find(i => i.key === 'flights').optionPrices = live.flights ? null : Object.fromEntries(
-        M.options.flights.map(([k]) => [k, money(estimateFlightPerPerson(km, k)) + ' pp']));
-    items.find(i => i.key === 'hotel').optionPrices = live.hotel ? null : Object.fromEntries(
-        M.options.hotel.map(([k]) => [k, money(M.hotelNight[k] * level ** M.hotelExp *
-            (big ? M.bigCityHotelFactor : 1)) + '/night']));
 
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     return { items, total, perPerson: total / travelers };

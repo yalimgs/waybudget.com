@@ -285,26 +285,10 @@ async function renderBudget() {
             group.className = 'item-choices';
             group.setAttribute('role', 'group');
             group.setAttribute('aria-label', `${item.label} option`);
-            if (options[0][2]) group.classList.add('rich');
-            options.forEach(([value, label, hint]) => {
+            options.forEach(([value, label]) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                const name = document.createElement('span');
-                name.className = 'choice-name';
-                name.textContent = label;
-                btn.appendChild(name);
-                if (hint) {
-                    const sub = document.createElement('span');
-                    sub.className = 'choice-hint';
-                    sub.textContent = hint;
-                    btn.appendChild(sub);
-                }
-                if (item.optionPrices && item.optionPrices[value]) {
-                    const price = document.createElement('span');
-                    price.className = 'choice-price';
-                    price.textContent = item.optionPrices[value];
-                    btn.appendChild(price);
-                }
+                btn.textContent = label;
                 btn.setAttribute('aria-pressed', String(value === choices[item.key]));
                 btn.addEventListener('click', () => {
                     if (choices[item.key] === value) return;
