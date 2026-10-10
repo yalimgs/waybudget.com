@@ -278,19 +278,27 @@ async function renderBudget() {
         detail.textContent = item.detail;
         body.append(title, detail);
 
-        // Per-item choice (e.g. budget flight + upscale hotel)
+        // Per-item choice (e.g. cheapest flight + 4–5★ hotel)
         const options = BUDGET_MODEL.options[item.key];
         if (options) {
-            const select = document.createElement('select');
-            select.className = 'item-choice';
-            select.setAttribute('aria-label', `${item.label} option`);
-            options.forEach(([value, label]) => select.add(new Option(label, value, false, value === choices[item.key])));
-            select.addEventListener('change', () => {
-                choices[item.key] = select.value;
-                syncPresetTabs();
-                renderBudget();
+            const group = document.createElement('div');
+            group.className = 'item-choices';
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', `${item.label} option`);
+            options.forEach(([value, label]) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = label;
+                btn.setAttribute('aria-pressed', String(value === choices[item.key]));
+                btn.addEventListener('click', () => {
+                    if (choices[item.key] === value) return;
+                    choices[item.key] = value;
+                    syncPresetTabs();
+                    renderBudget();
+                });
+                group.appendChild(btn);
             });
-            body.appendChild(select);
+            li._choices = group;
         }
 
         const amount = document.createElement('span');
@@ -298,6 +306,7 @@ async function renderBudget() {
         amount.textContent = money(item.amount);
 
         li.append(icon, body, amount);
+        if (li._choices) li.appendChild(li._choices);   // own row under the text
         list.appendChild(li);
     });
 

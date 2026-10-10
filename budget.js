@@ -16,11 +16,11 @@
 const BUDGET_MODEL = {
     // Choices offered per line item (first = cheapest). Labels are shown in the UI.
     options: {
-        flights:  [['budget', 'Cheapest fare'], ['standard', 'Standard fare'], ['comfort', 'Flexible fare']],
-        hotel:    [['budget', 'Budget · hostel / 2★'], ['standard', 'Mid-range · 3★'], ['comfort', 'Upscale · 4–5★']],
-        food:     [['budget', 'Street food & markets'], ['standard', 'Casual restaurants'], ['comfort', 'Fine dining']],
-        transfer: [['transit', 'Airport train / bus'], ['taxi', 'Taxi'], ['private', 'Private transfer']],
-        local:    [['public', 'Public transport'], ['mixed', 'Public + some taxis'], ['taxi', 'Mostly taxis']]
+        flights:  [['budget', 'Cheapest'], ['standard', 'Standard'], ['comfort', 'Flexible']],
+        hotel:    [['budget', 'Hostel / 2★'], ['standard', '3★'], ['comfort', '4–5★']],
+        food:     [['budget', 'Street food'], ['standard', 'Casual'], ['comfort', 'Fine dining']],
+        transfer: [['transit', 'Train / bus'], ['taxi', 'Taxi'], ['private', 'Private']],
+        local:    [['public', 'Public'], ['mixed', 'Mixed'], ['taxi', 'Taxi']]
     },
     // Quick presets for the Budget / Standard / Comfort tabs
     presets: {
