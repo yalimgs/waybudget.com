@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=cbb14e842c">
+    <link rel="stylesheet" href="style.css?v=f61440e5dc">
 </head>
 <body>
     <header class="hero">
@@ -28,7 +28,7 @@
             <span class="brand-name">WayBudget</span>
         </div>
         <h1>How much will your trip really cost?</h1>
-        <p class="tagline">Flights, stay, food, transfers and sights &mdash; one total, from door to door.</p>
+        <p class="tagline">Flights, stay, food, transfers and sights<br>One total, from door to door</p>
     </header>
 
     <main class="container">
@@ -58,11 +58,17 @@
             <div class="detail-row">
                 <div class="field">
                     <label for="startDate">Departure</label>
-                    <input type="date" id="startDate">
+                    <div class="date-input">
+                        <input type="date" id="startDate">
+                        <span class="date-display" data-for="startDate" aria-hidden="true">Select date</span>
+                    </div>
                 </div>
                 <div class="field">
                     <label for="endDate">Return</label>
-                    <input type="date" id="endDate">
+                    <div class="date-input">
+                        <input type="date" id="endDate">
+                        <span class="date-display" data-for="endDate" aria-hidden="true">Select date</span>
+                    </div>
                 </div>
                 <div class="field travelers-field">
                     <label for="passengers">Travelers</label>
@@ -77,14 +83,15 @@
 
             <p id="formError" class="form-error" role="alert" hidden></p>
 
-            <button type="submit" class="primary-btn">Plan My Route</button>
+            <button type="submit" class="primary-btn">Calculate my budget</button>
         </form>
-
-        <section id="summaryDisplay" class="summary" aria-live="polite" hidden></section>
 
         <section id="budgetResult" class="budget" aria-live="polite" hidden>
             <div class="budget-head">
-                <h2>Estimated budget</h2>
+                <div>
+                    <h2>Your trip budget</h2>
+                    <p id="tripLine" class="trip-line"></p>
+                </div>
                 <div class="budget-controls">
                     <div class="tier-tabs" role="group" aria-label="Quick preset for all items">
                         <button type="button" data-tier="budget">Budget</button>
@@ -110,10 +117,9 @@
                 <strong id="budgetTotal"></strong>
             </div>
             <p class="budget-note">
-                <span class="badge badge-live">Live</span> real prices ·
-                <span class="badge badge-estimate">Estimate</span> based on local price levels ·
-                <span class="badge badge-rough">Rough</span> fallback when no live price is available.
-                Attractions and entry fees are not included yet.
+                <span class="badge badge-live">Live</span> Real prices ·
+                <span class="badge badge-estimate">Estimate</span> Based on local price levels ·
+                <span class="badge badge-rough">Approx.</span> Fallback when no live price is available
             </p>
         </section>
     </main>
@@ -123,7 +129,7 @@
     </footer>
 
     <script src="search.js?v=37cc40c3ac"></script>
-    <script src="budget.js?v=c38c3ad479"></script>
-    <script src="app.js?v=e3494c8548"></script>
+    <script src="budget.js?v=5aef49e801"></script>
+    <script src="app.js?v=78a60c566c"></script>
 </body>
 </html>

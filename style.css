@@ -134,6 +134,23 @@ input.invalid {
     box-shadow: 0 0 0 3px rgba(192, 57, 43, .12);
 }
 
+/* Date fields: native picker underneath, "3 April 2026" shown on top */
+.date-input { position: relative; }
+.date-input input { color: transparent; cursor: pointer; }
+.date-input input::-webkit-datetime-edit { color: transparent; }
+.date-input input:focus::-webkit-datetime-edit { color: transparent; }
+.date-display {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    color: var(--ink);
+    pointer-events: none;
+    white-space: nowrap;
+}
+.date-display.empty { color: var(--muted); }
+
 /* Swap button between From/To */
 .swap-btn {
     width: 40px;
@@ -254,22 +271,7 @@ input.invalid {
 }
 
 /* ------------------------------------------------------------ Summary -- */
-.summary {
-    margin-top: 20px;
-    background: var(--card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 22px 24px;
-}
-.summary h2 { margin: 0 0 12px; font-size: 18px; }
-.summary dl {
-    display: grid;
-    grid-template-columns: 110px 1fr;
-    gap: 8px 16px;
-    margin: 0;
-}
-.summary dt { color: var(--muted); font-size: 14px; font-weight: 600; }
-.summary dd { margin: 0; font-size: 15px; font-weight: 600; }
+
 
 /* ------------------------------------------------------------- Budget -- */
 .budget {
@@ -289,6 +291,7 @@ input.invalid {
     margin-bottom: 8px;
 }
 .budget-head h2 { margin: 0; font-size: 18px; }
+.trip-line { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
 .budget-controls { display: flex; gap: 8px; align-items: center; }
 .tier-tabs {
     display: inline-flex;
@@ -446,7 +449,8 @@ input.invalid {
     .swap-btn:hover { transform: rotate(270deg); }
     .detail-row { grid-template-columns: 1fr 1fr; }
     .travelers-field { grid-column: 1 / -1; }
-    .summary dl { grid-template-columns: 90px 1fr; }
+    .date-display { left: 12px; right: 8px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+    .date-input input::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; inset: 0; width: auto; height: auto; }
     .budget { padding: 18px; }
     .budget-controls { width: 100%; justify-content: space-between; }
     .budget-item { grid-template-columns: 32px 1fr auto; gap: 10px; }

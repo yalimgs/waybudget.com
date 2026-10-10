@@ -183,7 +183,7 @@ function calculateBudget(trip, choices, live = {}) {
     if (ho) {
         const ex = ho.example ? ` · e.g. ${ho.example.name}` : '';
         items.push({
-            key: 'hotel', label: 'Accommodation',
+            key: 'hotel', label: 'Hotel',
             detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ${money(ho.perNight)}/night${ex}`,
             amount: ho.perNight * rooms * nights, kind: 'live',
             source: `Live rates for your dates, ${live.hotel.count} hotels compared`
@@ -191,7 +191,7 @@ function calculateBudget(trip, choices, live = {}) {
     } else {
         const perNight = M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
-            key: 'hotel', label: 'Accommodation',
+            key: 'hotel', label: 'Hotel',
             detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
             amount: perNight * rooms * nights, kind: live.loadingHotel ? 'loading' : 'rough',
             source: live.loadingHotel ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
@@ -221,14 +221,14 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `Both ways · ${plural(cars, 'car')} · ~${Math.round(roadKm)} km · ~${money(ride)} per ride` };
     }
     items.push({
-        key: 'transfer', label: 'Airport ⇄ hotel', ...transfer, kind: 'estimate',
+        key: 'transfer', label: 'Airport transfers', ...transfer, kind: 'estimate',
         source: `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre`
     });
 
     // ---- Getting around the city during the stay
     const localDay = M.localDay[choices.local] * level ** M.localExp;
     items.push({
-        key: 'local', label: 'Getting around the city',
+        key: 'local', label: 'Local transport',
         detail: `${travelers} × ${days} days · ~${money(localDay)} per person/day`,
         amount: localDay * travelers * days, kind: 'estimate',
         source: 'Metro, bus, tram and short rides while sightseeing'
@@ -296,7 +296,7 @@ function fxNoteText() {
     if (priceData.fxDate) {
         const [y, m, d] = priceData.fxDate.split('-').map(Number);
         when = ' · rates of ' + new Date(y, m - 1, d)
-            .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            .toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     }
     return `1 USD = ${rate.toLocaleString('en', { maximumFractionDigits: 4 })} ${displayCurrency}${when}`;
 }

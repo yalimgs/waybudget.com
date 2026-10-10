@@ -10,7 +10,7 @@ const els = {};
 let autocomplete = {};
 
 document.addEventListener('DOMContentLoaded', () => {
-    ['tripForm', 'startDate', 'endDate', 'passengers', 'summaryDisplay',
+    ['tripForm', 'startDate', 'endDate', 'passengers', 'tripLine',
      'formError', 'swapBtn', 'year'].forEach(id => { els[id] = document.getElementById(id); });
 
     autocomplete.origin = setupAutocomplete('origin');
@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
     els.swapBtn.addEventListener('click', swapCities);
     els.tripForm.addEventListener('submit', submitTrip);
     document.addEventListener('trip:change', updateRouteSummary);
+
+    // Clicking anywhere on a date field opens the calendar
+    [els.startDate, els.endDate].forEach(input => input.addEventListener('click', () => {
+        try { input.showPicker(); } catch (e) { /* older browsers open it themselves */ }
+    }));
+    updateDateDisplays();
 
     setupTravelersInput();
     setupBudgetControls();
@@ -56,12 +62,10 @@ function nightsBetween(startIso, endIso) {
     return Math.round((toUtc(endIso) - toUtc(startIso)) / 86400000);
 }
 
-/** Human-friendly date, e.g. "Sat, 10 Oct 2026". */
+/** Human-friendly date, e.g. "3 April 2026". */
 function formatDate(isoDate) {
     const [y, m, d] = isoDate.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
-        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-    });
+    return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /**
@@ -135,45 +139,24 @@ function swapCities() {
  */
 function updateRouteSummary() {
     invalidateBudget();
-    const { origin, destination } = tripData;
-    const start = els.startDate.value;
-    const end = els.endDate.value;
-    const travelers = getTravelers();
-    const box = els.summaryDisplay;
+    updateDateDisplays();
+}
 
-    if (!origin && !destination && !start && !end) {
-        box.hidden = true;
-        return;
-    }
-
-    const rows = [];
-    if (origin || destination) {
-        const from = origin ? `${origin.n} (${origin.a[0]})` : '—';
-        const to = destination ? `${destination.n} (${destination.a[0]})` : '—';
-        rows.push(['Route', `${from} → ${to}`]);
-    }
-    if (start && end) {
-        const nights = nightsBetween(start, end);
-        rows.push(['Dates', `${formatDate(start)} – ${formatDate(end)}`]);
-        rows.push(['Duration', `${nights} night${nights === 1 ? '' : 's'}, ${nights + 1} days`]);
-    } else if (start) {
-        rows.push(['Departure', formatDate(start)]);
-    }
-    rows.push(['Travelers', `${travelers} ${travelers === 1 ? 'person' : 'people'}`]);
-
-    box.innerHTML = '';
-    const title = document.createElement('h2');
-    title.textContent = 'Your trip';
-    const dl = document.createElement('dl');
-    rows.forEach(([label, value]) => {
-        const dt = document.createElement('dt');
-        dt.textContent = label;
-        const dd = document.createElement('dd');
-        dd.textContent = value;
-        dl.append(dt, dd);
+/* Shows the chosen dates as "3 April 2026" (the native field follows the browser locale) */
+function updateDateDisplays() {
+    document.querySelectorAll('.date-display').forEach(span => {
+        const value = document.getElementById(span.dataset.for).value;
+        span.textContent = value ? formatDate(value) : 'Select date';
+        span.classList.toggle('empty', !value);
     });
-    box.append(title, dl);
-    box.hidden = false;
+}
+
+/* One-line trip summary shown under the budget title */
+function tripLineText(trip) {
+    const nights = trip.nights;
+    const people = `${trip.travelers} traveler${trip.travelers === 1 ? '' : 's'}`;
+    return `${trip.origin.n} → ${trip.destination.n} · ${formatDate(trip.start)} – ${formatDate(trip.end)} · ` +
+           `${nights} night${nights === 1 ? '' : 's'} · ${people}`;
 }
 
 /* ----------------------------------------------------------- Submission -- */
@@ -271,7 +254,7 @@ function loadLivePrices() {
 let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
-const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough', loading: 'Working…', none: '' };
+const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Approx.', loading: 'Working…', none: '' };
 
 async function renderBudget() {
     if (!currentTrip) return;
@@ -338,6 +321,7 @@ async function renderBudget() {
         list.appendChild(li);
     });
 
+    els.tripLine.textContent = tripLineText(currentTrip);
     document.getElementById('fxNote').textContent = fxNoteText();
     document.getElementById('budgetTotal').textContent = money(result.total);
     document.getElementById('budgetPerPerson').textContent =
