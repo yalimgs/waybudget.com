@@ -48,14 +48,10 @@ body {
     letter-spacing: -.01em;
 }
 .brand-mark {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    background: var(--accent);
-    color: var(--ink);
-    font-size: 18px;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .25);
 }
 .hero h1 {
     margin: 0 auto 10px;
