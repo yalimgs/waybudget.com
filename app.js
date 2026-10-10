@@ -241,7 +241,7 @@ function submitTrip(event) {
 /* --------------------------------------------------------------- Budget -- */
 
 let currentTrip = null;
-let currentTier = 'standard';
+let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
 const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough' };
@@ -250,7 +250,7 @@ async function renderBudget() {
     if (!currentTrip) return;
     await pricesReady;
 
-    const result = calculateBudget(currentTrip, currentTier);
+    const result = calculateBudget(currentTrip, choices);
     const list = document.getElementById('budgetItems');
     list.innerHTML = '';
 
@@ -278,6 +278,21 @@ async function renderBudget() {
         detail.textContent = item.detail;
         body.append(title, detail);
 
+        // Per-item choice (e.g. budget flight + upscale hotel)
+        const options = BUDGET_MODEL.options[item.key];
+        if (options) {
+            const select = document.createElement('select');
+            select.className = 'item-choice';
+            select.setAttribute('aria-label', `${item.label} option`);
+            options.forEach(([value, label]) => select.add(new Option(label, value, false, value === choices[item.key])));
+            select.addEventListener('change', () => {
+                choices[item.key] = select.value;
+                syncPresetTabs();
+                renderBudget();
+            });
+            body.appendChild(select);
+        }
+
         const amount = document.createElement('span');
         amount.className = 'item-amount';
         amount.textContent = money(item.amount);
@@ -296,9 +311,8 @@ async function renderBudget() {
 function setupBudgetControls() {
     document.querySelectorAll('.tier-tabs button').forEach(btn => {
         btn.addEventListener('click', () => {
-            currentTier = btn.dataset.tier;
-            document.querySelectorAll('.tier-tabs button')
-                .forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+            choices = { ...BUDGET_MODEL.presets[btn.dataset.tier] };
+            syncPresetTabs();
             renderBudget();
         });
     });
@@ -306,6 +320,15 @@ function setupBudgetControls() {
     document.getElementById('currency').addEventListener('change', e => {
         displayCurrency = e.target.value;
         renderBudget();
+    });
+}
+
+/* Highlights the preset tab matching the current choices (none = custom mix) */
+function syncPresetTabs() {
+    document.querySelectorAll('.tier-tabs button').forEach(btn => {
+        const preset = BUDGET_MODEL.presets[btn.dataset.tier];
+        const match = Object.keys(preset).every(k => preset[k] === choices[k]);
+        btn.setAttribute('aria-pressed', String(match));
     });
 }
 

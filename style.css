@@ -307,7 +307,7 @@ input.invalid {
     color: var(--ink-soft);
     cursor: pointer;
 }
-.tier-tabs button[aria-selected="true"] {
+.tier-tabs button[aria-pressed="true"] {
     background: #fff;
     color: var(--brand);
     box-shadow: 0 1px 3px rgba(15, 36, 48, .12);
@@ -344,6 +344,21 @@ input.invalid {
 .item-body { min-width: 0; }
 .item-title { font-weight: 700; font-size: 15px; }
 .item-detail { font-size: 13px; color: var(--muted); }
+.item-choice {
+    margin-top: 6px;
+    max-width: 100%;
+    height: 30px;
+    padding: 0 26px 0 8px;
+    border: 1.5px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.item-choice:hover, .item-choice:focus { border-color: var(--brand); outline: none; color: var(--ink); }
 .item-amount { font-weight: 700; font-size: 16px; white-space: nowrap; }
 .badge {
     display: inline-block;

@@ -14,7 +14,20 @@
 // ============================================================================
 
 const BUDGET_MODEL = {
-    tiers: ['budget', 'standard', 'comfort'],
+    // Choices offered per line item (first = cheapest). Labels are shown in the UI.
+    options: {
+        flights:  [['budget', 'Cheapest fare'], ['standard', 'Standard fare'], ['comfort', 'Flexible fare']],
+        hotel:    [['budget', 'Budget · hostel / 2★'], ['standard', 'Mid-range · 3★'], ['comfort', 'Upscale · 4–5★']],
+        food:     [['budget', 'Street food & markets'], ['standard', 'Casual restaurants'], ['comfort', 'Fine dining']],
+        transfer: [['transit', 'Airport train / bus'], ['taxi', 'Taxi'], ['private', 'Private transfer']],
+        local:    [['public', 'Public transport'], ['mixed', 'Public + some taxis'], ['taxi', 'Mostly taxis']]
+    },
+    // Quick presets for the Budget / Standard / Comfort tabs
+    presets: {
+        budget:   { flights: 'budget', hotel: 'budget', food: 'budget', transfer: 'transit', local: 'public' },
+        standard: { flights: 'standard', hotel: 'standard', food: 'standard', transfer: 'taxi', local: 'mixed' },
+        comfort:  { flights: 'comfort', hotel: 'comfort', food: 'comfort', transfer: 'private', local: 'taxi' }
+    },
 
     // Hotel: price per room per night (US base), 2 travelers per room
     hotelNight:   { budget: 90, standard: 170, comfort: 300 },
@@ -27,14 +40,15 @@ const BUDGET_MODEL = {
     foodExp: 0.75,
     bigCityFoodFactor: 1.1,
 
-    // Getting around the city: per person per day (transit, short taxi rides)
-    localDay:     { budget: 6, standard: 12, comfort: 30 },
+    // Getting around the city during the stay: per person per day (US base)
+    localDay:     { public: 6, mixed: 12, taxi: 30 },
     localExp: 0.8,
 
     // Airport <-> hotel, each way
     taxiFlag: 4, taxiPerKm: 1.9,      // US base, per car (up to 4 people)
     peoplePerCar: 4,
     roadFactor: 1.3,                  // road distance vs straight line
+    privateFactor: 1.6,               // pre-booked private car vs street taxi
     transitTrip: 6,                   // US base airport train/bus per person
     transitExp: 0.8,
 
@@ -92,12 +106,13 @@ function estimateFlightPerPerson(km, tier) {
 }
 
 /**
- * Builds the budget for one tier.
- * trip = { origin, destination, nights, travelers }
- * live = optional { flights: {perPerson, source}, hotel: {perNight, source} }
+ * Builds the budget.
+ * trip    = { origin, destination, nights, travelers }
+ * choices = { flights, hotel, food, transfer, local }  (option keys from BUDGET_MODEL.options)
+ * live    = optional { flights: {perPerson, source}, hotel: {perNight, source} }
  * Returns { items: [...], total, perPerson }. All amounts in USD.
  */
-function calculateBudget(trip, tier, live = {}) {
+function calculateBudget(trip, choices, live = {}) {
     const M = BUDGET_MODEL;
     const { origin, destination, nights, travelers } = trip;
     const days = nights + 1;
@@ -105,6 +120,7 @@ function calculateBudget(trip, tier, live = {}) {
     const big = destination.l === 1;
     const rooms = Math.ceil(travelers / M.peoplePerRoom);
     const cars = Math.ceil(travelers / M.peoplePerCar);
+    const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
     const items = [];
 
     // ---- Flights
@@ -116,7 +132,7 @@ function calculateBudget(trip, tier, live = {}) {
             amount: live.flights.perPerson * travelers, kind: 'live', source: live.flights.source
         });
     } else {
-        const perPerson = estimateFlightPerPerson(km, tier);
+        const perPerson = estimateFlightPerPerson(km, choices.flights);
         items.push({
             key: 'flights', label: 'Flights',
             detail: `Round trip ${origin.a[0]} ⇄ ${destination.a[0]} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
@@ -129,21 +145,21 @@ function calculateBudget(trip, tier, live = {}) {
     if (live.hotel) {
         items.push({
             key: 'hotel', label: 'Accommodation',
-            detail: `${rooms} room${rooms > 1 ? 's' : ''} × ${nights} night${nights > 1 ? 's' : ''} · ${money(live.hotel.perNight)}/night`,
+            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ${money(live.hotel.perNight)}/night`,
             amount: live.hotel.perNight * rooms * nights, kind: 'live', source: live.hotel.source
         });
     } else {
-        const perNight = M.hotelNight[tier] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
+        const perNight = M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
             key: 'hotel', label: 'Accommodation',
-            detail: `${rooms} room${rooms > 1 ? 's' : ''} × ${nights} night${nights > 1 ? 's' : ''} · ~${money(perNight)}/night`,
+            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
             amount: perNight * rooms * nights, kind: 'rough',
             source: 'Price-level estimate until live hotel rates are connected'
         });
     }
 
     // ---- Food
-    const foodDay = M.foodDay[tier] * level ** M.foodExp * (big ? M.bigCityFoodFactor : 1);
+    const foodDay = M.foodDay[choices.food] * level ** M.foodExp * (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
         detail: `${travelers} × ${days} days · ~${money(foodDay)} per person/day`,
@@ -153,26 +169,29 @@ function calculateBudget(trip, tier, live = {}) {
 
     // ---- Airport transfers (both ways)
     const roadKm = Math.max(8, destination.d || 20) * M.roadFactor;
-    const taxiOneWay = (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
-    const transitOneWay = M.transitTrip * level ** M.transitExp;
-    const useTaxi = tier !== 'budget';
+    const taxiRide = (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
+    let transfer;
+    if (choices.transfer === 'transit') {
+        const ride = M.transitTrip * level ** M.transitExp;
+        transfer = { amount: ride * travelers * 2,
+            detail: `Both ways · ${travelers} × ~${money(ride)} per ride` };
+    } else {
+        const ride = taxiRide * (choices.transfer === 'private' ? M.privateFactor : 1);
+        transfer = { amount: ride * cars * 2,
+            detail: `Both ways · ${plural(cars, 'car')} · ~${Math.round(roadKm)} km · ~${money(ride)} per ride` };
+    }
     items.push({
-        key: 'transfer', label: 'Airport ⇄ hotel',
-        detail: useTaxi
-            ? `Taxi both ways · ${cars} car${cars > 1 ? 's' : ''} · ~${Math.round(roadKm)} km · ~${money(taxiOneWay)} per ride`
-            : `Airport train/bus both ways · ${travelers} × ~${money(transitOneWay)} per ride`,
-        amount: useTaxi ? taxiOneWay * cars * 2 : transitOneWay * travelers * 2,
-        kind: 'estimate',
-        source: `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the centre`
+        key: 'transfer', label: 'Airport ⇄ hotel', ...transfer, kind: 'estimate',
+        source: `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre`
     });
 
-    // ---- Local transport during the stay
-    const localDay = M.localDay[tier] * level ** M.localExp;
+    // ---- Getting around the city during the stay
+    const localDay = M.localDay[choices.local] * level ** M.localExp;
     items.push({
-        key: 'local', label: 'Getting around',
+        key: 'local', label: 'Getting around the city',
         detail: `${travelers} × ${days} days · ~${money(localDay)} per person/day`,
         amount: localDay * travelers * days, kind: 'estimate',
-        source: 'Public transport and occasional short rides'
+        source: 'Metro, bus, tram and short rides while sightseeing'
     });
 
     const total = items.reduce((sum, item) => sum + item.amount, 0);

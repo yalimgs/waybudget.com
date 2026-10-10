@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3bb6b97be5">
+    <link rel="stylesheet" href="style.css?v=10fd59a6a7">
 </head>
 <body>
     <header class="hero">
@@ -76,10 +76,10 @@
             <div class="budget-head">
                 <h2>Estimated budget</h2>
                 <div class="budget-controls">
-                    <div class="tier-tabs" role="tablist" aria-label="Travel style">
-                        <button type="button" role="tab" data-tier="budget">Budget</button>
-                        <button type="button" role="tab" data-tier="standard" aria-selected="true">Standard</button>
-                        <button type="button" role="tab" data-tier="comfort">Comfort</button>
+                    <div class="tier-tabs" role="group" aria-label="Quick preset for all items">
+                        <button type="button" data-tier="budget">Budget</button>
+                        <button type="button" data-tier="standard" aria-pressed="true">Standard</button>
+                        <button type="button" data-tier="comfort">Comfort</button>
                     </div>
                     <label class="sr-only" for="currency">Currency</label>
                     <select id="currency">
@@ -113,7 +113,7 @@
     </footer>
 
     <script src="search.js?v=37cc40c3ac"></script>
-    <script src="budget.js?v=aef8e2c11a"></script>
-    <script src="app.js?v=4da3026e44"></script>
+    <script src="budget.js?v=88f4fddeb8"></script>
+    <script src="app.js?v=4d097aa6cc"></script>
 </body>
 </html>
