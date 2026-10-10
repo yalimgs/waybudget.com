@@ -16,7 +16,7 @@ const TTL = 6 * 3600;
 
 async function query(env, p) {
     const url = new URL(API);
-    Object.entries({ currency: 'usd', sorting: 'price', unique: 'false', limit: '30',
+    Object.entries({ currency: 'usd', sorting: 'price', unique: 'false', limit: '100',
                      one_way: 'false', ...p }).forEach(([k, v]) => url.searchParams.set(k, v));
     const res = await fetch(url, { headers: { 'X-Access-Token': env.TRAVELPAYOUTS_TOKEN } });
     const body = await res.json().catch(() => ({}));
@@ -26,8 +26,26 @@ async function query(env, p) {
     return body.data || [];
 }
 
-function pick(list) {
-    const f = list.filter(x => typeof x.price === 'number').sort((a, b) => a.price - b.price)[0];
+const DAY = 86400000;
+
+/*
+ * Cheapest fare, preferring trips close to the requested dates: in month
+ * mode a 2-day trip on the 10th says little about an 11-day trip on the 3rd.
+ */
+function pick(list, depart, ret) {
+    const want = { dep: Date.parse(depart), len: (Date.parse(ret) - Date.parse(depart)) / DAY };
+    const fares = list.filter(x => typeof x.price === 'number' && x.departure_at && x.return_at)
+        .map(x => {
+            const dep = Date.parse(x.departure_at.slice(0, 10));
+            const len = (Date.parse(x.return_at.slice(0, 10)) - dep) / DAY;
+            return { x, dDep: Math.abs(dep - want.dep) / DAY, dLen: Math.abs(len - want.len) };
+        });
+    const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4, () => true];
+    let f = null;
+    for (const ok of tiers) {
+        const c = fares.filter(ok).sort((a, b) => a.x.price - b.x.price)[0];
+        if (c) { f = c.x; break; }
+    }
     if (!f) return null;
     return {
         price: f.price,
@@ -54,12 +72,6 @@ export async function onRequestGet(context) {
     }
     if (!env.TRAVELPAYOUTS_TOKEN) return json({ error: 'Flight API is not configured' }, 503);
 
-    if (q.get('raw') === '1') {   // temporary: inspect upstream data while integrating
-        try {
-            return json({ raw: (await query(env, { origin, destination, departure_at: depart, return_at: ret })).slice(0, 3) });
-        } catch (e) { return json({ error: e.message }, 502); }
-    }
-
     return cached(context, TTL, async () => {
         try {
             const base = { origin, destination };
@@ -75,9 +87,13 @@ export async function onRequestGet(context) {
                     query(env, { ...base, departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7), direct: 'true' })
                 ]);
             }
-            const economy = pick(any);
+            const economy = pick(any, depart, ret);
             if (!economy) return { found: false };
-            return { found: true, match, currency: 'USD', economy, direct: pick(direct),
+            let directFare = pick(direct, depart, ret);
+            // the cheapest fare may itself be non-stop both ways
+            if (economy.transfers === 0 && economy.returnTransfers === 0 &&
+                (!directFare || economy.price <= directFare.price)) directFare = economy;
+            return { found: true, match, currency: 'USD', economy, direct: directFare,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
             return { error: e.message };

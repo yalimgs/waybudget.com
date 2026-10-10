@@ -58,6 +58,7 @@ const BUDGET_MODEL = {
     // Premium = business class (multiple of economy, larger on long haul)
     flightFactor: { economy: 0.85, standard: 1 },
     businessFactor: [[1500, 2.5], [4000, 3], [Infinity, 4]],   // [up to km, × standard fare]
+    directFallbackFactor: 1.18,       // no direct flight seen: standard ≈ cheapest × 1.18
 
     defaultLevel: 0.5                 // countries with no price data
 };
@@ -132,36 +133,59 @@ function calculateBudget(trip, choices, live = {}) {
 
     // ---- Flights
     const km = distanceKm(origin, destination);
-    if (live.flights) {
+    const route = `Round trip ${origin.a[0]} ⇄ ${destination.a[0]}`;
+    const fl = live.flights && live.flights.found ? live.flights : null;
+    if (fl) {
+        const seen = fl.match === 'month' ? 'Lowest fare seen recently for these months' : 'Fare seen recently for these dates';
+        const directOrEst = fl.direct ? fl.direct.price : fl.economy.price * M.directFallbackFactor;
+        let perPerson, kind = 'live', info, source = `${seen} (Aviasales)`;
+        if (choices.flights === 'economy') {
+            perPerson = fl.economy.price;
+            info = describeFare(fl.economy);
+        } else if (choices.flights === 'standard') {
+            perPerson = directOrEst;
+            if (fl.direct) info = describeFare(fl.direct);
+            else { kind = 'estimate'; info = 'No direct flights seen'; source = 'Estimated from the lowest live fare'; }
+        } else {
+            const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
+            perPerson = directOrEst * factor;
+            kind = 'estimate'; info = 'Business class';
+            source = 'Estimated from live economy fares';
+        }
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `Round trip ${origin.a[0]} ⇄ ${destination.a[0]} · ${travelers} × ${money(live.flights.perPerson)}`,
-            amount: live.flights.perPerson * travelers, kind: 'live', source: live.flights.source
+            detail: `${route} · ${info} · ${travelers} × ${money(perPerson)}`,
+            amount: perPerson * travelers, kind, source
         });
     } else {
         const perPerson = estimateFlightPerPerson(km, choices.flights);
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `Round trip ${origin.a[0]} ⇄ ${destination.a[0]} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
+            detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}` +
+                    (live.loading ? ' · checking live fares…' : ''),
             amount: perPerson * travelers, kind: 'rough',
-            source: 'Distance-based estimate until live fares are connected'
+            source: live.loading ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'
         });
     }
 
     // ---- Accommodation
-    if (live.hotel) {
+    const ho = live.hotel && live.hotel.found ? live.hotel[choices.hotel] : null;
+    if (ho) {
+        const ex = ho.example ? ` · e.g. ${ho.example.name}` : '';
         items.push({
             key: 'hotel', label: 'Accommodation',
-            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ${money(live.hotel.perNight)}/night`,
-            amount: live.hotel.perNight * rooms * nights, kind: 'live', source: live.hotel.source
+            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ${money(ho.perNight)}/night${ex}`,
+            amount: ho.perNight * rooms * nights, kind: 'live',
+            source: `Live rates for your dates, ${live.hotel.count} hotels compared`
         });
     } else {
         const perNight = M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
             key: 'hotel', label: 'Accommodation',
-            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
+            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night` +
+                    (live.loading ? ' · checking live rates…' : ''),
             amount: perNight * rooms * nights, kind: 'rough',
-            source: 'Price-level estimate until live hotel rates are connected'
+            source: live.loading ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
         });
     }
 
@@ -203,6 +227,41 @@ function calculateBudget(trip, choices, live = {}) {
 
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     return { items, total, perPerson: total / travelers };
+}
+
+/* ------------------------------------------------------------ Live data -- */
+
+const AIRLINES = {
+    VF: 'AJet', PC: 'Pegasus', TK: 'Turkish Airlines', XQ: 'SunExpress', W6: 'Wizz Air', FR: 'Ryanair',
+    U2: 'easyJet', LH: 'Lufthansa', AF: 'Air France', KL: 'KLM', BA: 'British Airways', AZ: 'ITA Airways',
+    LX: 'SWISS', OS: 'Austrian', A3: 'Aegean', EK: 'Emirates', QR: 'Qatar Airways', EY: 'Etihad',
+    SU: 'Aeroflot', IB: 'Iberia', VY: 'Vueling', TP: 'TAP', SK: 'SAS', AY: 'Finnair', LO: 'LOT',
+    DL: 'Delta', UA: 'United', AA: 'American', AC: 'Air Canada', SQ: 'Singapore Airlines',
+    CX: 'Cathay Pacific', NH: 'ANA', JL: 'JAL', KE: 'Korean Air', MS: 'EgyptAir', SV: 'Saudia',
+    FZ: 'flydubai', G9: 'Air Arabia', J2: 'AZAL', PS: 'UIA', RO: 'TAROM', JU: 'Air Serbia', EW: 'Eurowings',
+    HV: 'Transavia', TO: 'Transavia France', DY: 'Norwegian', BT: 'airBaltic', '6E': 'IndiGo', AI: 'Air India'
+};
+
+function describeFare(f) {
+    const airline = AIRLINES[f.airline] || f.airline || '';
+    const stops = Math.max(f.transfers || 0, f.returnTransfers || 0);
+    const stopText = stops === 0 ? 'Direct' : `${stops} stop${stops > 1 ? 's' : ''}`;
+    return [airline, stopText].filter(Boolean).join(' · ');
+}
+
+/**
+ * Fetches live flight and hotel prices for a trip (both edge-cached on our
+ * side). Resolves to { flights, hotel }; either may be null on failure.
+ */
+async function fetchLivePrices(trip, startIso, endIso) {
+    const { origin, destination, travelers } = trip;
+    const get = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+    const flightsUrl = `/api/flights?origin=${origin.a[0]}&destination=${destination.a[0]}` +
+                       `&depart=${startIso}&return=${endIso}`;
+    const hotelsUrl = `/api/hotels?lat=${destination.lat}&lon=${destination.lon}` +
+                      `&checkin=${startIso}&checkout=${endIso}&adults=${Math.min(2, travelers)}`;
+    const [flights, hotel] = await Promise.all([get(flightsUrl), get(hotelsUrl)]);
+    return { flights: flights && !flights.error ? flights : null, hotel: hotel && !hotel.error ? hotel : null };
 }
 
 /* ------------------------------------------------------------- Currency -- */

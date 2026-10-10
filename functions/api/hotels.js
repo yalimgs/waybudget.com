@@ -76,14 +76,6 @@ export async function onRequestGet(context) {
     if (nights < 1 || nights > 60) return json({ error: 'invalid stay length' }, 400);
     if (!env.LITEAPI_KEY) return json({ error: 'Hotel API is not configured' }, 503);
 
-    if (q.get('raw') === '1') {   // temporary: inspect upstream data while integrating
-        try {
-            const r = await fetchRates(env, p);
-            return json({ keys: Object.keys(r), first: (r.data || []).slice(0, 2),
-                          hotelsSample: (r.hotels || []).slice(0, 2), count: (r.data || []).length });
-        } catch (e) { return json({ error: e.message }, 502); }
-    }
-
     return cached(context, TTL, async () => {
         try {
             const r = await fetchRates(env, p);
@@ -96,14 +88,16 @@ export async function onRequestGet(context) {
                 list.push({
                     name: h.name || null,
                     stars: Number(h.stars ?? h.starRating) || null,
-                    rating: Number(h.rating ?? h.reviewScore) || null,
+                    rating: Number(h.rating) || null,
+                    reviews: Number(h.review_count) || 0,
                     perNight: Math.round((total / nights) * 100) / 100
                 });
             }
             if (list.length < 3) return { found: false, count: list.length };
 
             const byPrice = arr => arr.slice().sort((a, b) => a.perNight - b.perNight);
-            const rated = list.filter(h => h.rating === null || h.rating >= 7);
+            // well-rated = 7+/10 with some reviews behind it
+            const rated = list.filter(h => h.rating >= 7 && h.reviews >= 20);
             const pool = rated.length >= 5 ? rated : list;
             const upscale = list.filter(h => (h.stars || 0) >= 4);
             const luxuryPool = upscale.length >= 3 ? upscale : pool;

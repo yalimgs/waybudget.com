@@ -234,13 +234,22 @@ function submitTrip(event) {
     updateRouteSummary();
 
     currentTrip = { origin, destination, nights: nightsBetween(start, end), travelers: getTravelers() };
+    liveData = { loading: true };
     renderBudget();
+
+    const trip = currentTrip;
+    fetchLivePrices(trip, start, end).then(data => {
+        if (currentTrip !== trip) return;          // inputs changed meanwhile
+        liveData = { ...data, loading: false };
+        renderBudget();
+    });
     document.getElementById('budgetResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* --------------------------------------------------------------- Budget -- */
 
 let currentTrip = null;
+let liveData = {};
 let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
@@ -250,7 +259,7 @@ async function renderBudget() {
     if (!currentTrip) return;
     await pricesReady;
 
-    const result = calculateBudget(currentTrip, choices);
+    const result = calculateBudget(currentTrip, choices, liveData);
     const list = document.getElementById('budgetItems');
     list.innerHTML = '';
 
@@ -345,5 +354,6 @@ function syncPresetTabs() {
 function invalidateBudget() {
     if (!currentTrip) return;
     currentTrip = null;
+    liveData = {};
     document.getElementById('budgetResult').hidden = true;
 }
