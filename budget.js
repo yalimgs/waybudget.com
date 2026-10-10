@@ -51,6 +51,24 @@ const pricesReady = fetch('data/prices.json')
     .then(data => { priceData = data; })
     .catch(err => console.error('Price data could not be loaded:', err));
 
+/*
+ * Live exchange rates from /api/fx (edge-cached for an hour). Loaded in the
+ * background: the page works immediately with the rates bundled in
+ * data/prices.json and switches to fresh rates as soon as they arrive.
+ */
+const fxReady = pricesReady
+    .then(() => fetch('/api/fx'))
+    .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+    .then(data => {
+        if (priceData && data.fx) {
+            priceData.fx = { ...priceData.fx, ...data.fx };
+            priceData.fxDate = data.date || priceData.fxDate;
+            priceData.fxLive = true;
+            document.dispatchEvent(new CustomEvent('fx:update'));
+        }
+    })
+    .catch(() => { /* keep bundled rates */ });
+
 function priceLevel(countryCode) {
     return (priceData && priceData.level[countryCode]) || BUDGET_MODEL.defaultLevel;
 }
@@ -165,6 +183,19 @@ function calculateBudget(trip, tier, live = {}) {
 
 let displayCurrency = 'USD';
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', TRY: '₺' };
+
+/** "1 USD = 49.43 TRY · rates of 10 Oct 2026" for the current currency. */
+function fxNoteText() {
+    if (!priceData || displayCurrency === 'USD') return '';
+    const rate = priceData.fx[displayCurrency];
+    let when = '';
+    if (priceData.fxDate) {
+        const [y, m, d] = priceData.fxDate.split('-').map(Number);
+        when = ' · rates of ' + new Date(y, m - 1, d)
+            .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return `1 USD = ${rate.toLocaleString('en', { maximumFractionDigits: 4 })} ${displayCurrency}${when}`;
+}
 
 function money(usd) {
     const rate = (priceData && priceData.fx[displayCurrency]) || 1;

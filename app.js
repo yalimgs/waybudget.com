@@ -286,6 +286,7 @@ async function renderBudget() {
         list.appendChild(li);
     });
 
+    document.getElementById('fxNote').textContent = fxNoteText();
     document.getElementById('budgetTotal').textContent = money(result.total);
     document.getElementById('budgetPerPerson').textContent =
         currentTrip.travelers > 1 ? `${money(result.perPerson)} per person` : '';
@@ -301,6 +302,7 @@ function setupBudgetControls() {
             renderBudget();
         });
     });
+    document.addEventListener('fx:update', renderBudget);
     document.getElementById('currency').addEventListener('change', e => {
         displayCurrency = e.target.value;
         renderBudget();
