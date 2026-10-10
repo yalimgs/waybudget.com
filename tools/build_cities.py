@@ -156,6 +156,7 @@ for ap in sorted(airports, key=lambda a: TYPE_RANK[a["type"]]):
              "lat": round(lat, 3), "lon": round(lon, 3), "ap": [], "k": set()}
         clusters[key].append(g)
     code = ap["iata_code"].strip()
+    g.setdefault("apll", {})[code] = (float(ap["latitude_deg"]), float(ap["longitude_deg"]))
     g["ap"].append((TYPE_RANK[ap["type"]], -(runway[ap["ident"]] + (100000 if ap["iata_code"].strip() in PRIMARY else 0)), code, ap["name"]))
     if code in ALIASES:
         g["k"].add(ALIASES[code])
@@ -174,6 +175,9 @@ for g in groups.values():
         "n": g["n"], "c": g["c"], "cc": g["cc"], "lat": g["lat"], "lon": g["lon"],
         "a": [x[2] for x in g["ap"]],                   # IATA codes, main airport first
         "an": [x[3] for x in g["ap"]],                  # airport names (searchable)
+        # km from main airport to city centre (for transfer estimates)
+        # (straight line; bogus values from unmatched cities fall back to 20 km)
+        "d": (lambda km: km if km <= 90 else 20)(round(dist_km(g["lat"], g["lon"], *g["apll"][g["ap"][0][2]]))),
         "k": " ".join(sorted(g["k"])),                  # extra search keywords
         "l": 1 if any(x[0] == 0 for x in g["ap"]) else 0,  # has a large airport
     })

@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('trip:change', updateRouteSummary);
 
     setupTravelersInput();
+    setupBudgetControls();
     updateRouteSummary();
 });
 
@@ -133,6 +134,7 @@ function swapCities() {
  * Renders the live trip summary card below the form.
  */
 function updateRouteSummary() {
+    invalidateBudget();
     const { origin, destination } = tripData;
     const start = els.startDate.value;
     const end = els.endDate.value;
@@ -231,9 +233,83 @@ function submitTrip(event) {
     els.passengers.value = String(getTravelers());
     updateRouteSummary();
 
-    const note = document.createElement('p');
-    note.className = 'coming-soon';
-    note.textContent = 'Budget estimate is coming soon — flights, stay, food, transfers and sights in one total.';
-    els.summaryDisplay.appendChild(note);
-    els.summaryDisplay.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    currentTrip = { origin, destination, nights: nightsBetween(start, end), travelers: getTravelers() };
+    renderBudget();
+    document.getElementById('budgetResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* --------------------------------------------------------------- Budget -- */
+
+let currentTrip = null;
+let currentTier = 'standard';
+
+const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
+const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough' };
+
+async function renderBudget() {
+    if (!currentTrip) return;
+    await pricesReady;
+
+    const result = calculateBudget(currentTrip, currentTier);
+    const list = document.getElementById('budgetItems');
+    list.innerHTML = '';
+
+    result.items.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'budget-item';
+
+        const icon = document.createElement('span');
+        icon.className = 'item-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = ITEM_ICONS[item.key] || '•';
+
+        const body = document.createElement('div');
+        body.className = 'item-body';
+        const title = document.createElement('div');
+        title.className = 'item-title';
+        title.textContent = item.label + ' ';
+        const badge = document.createElement('span');
+        badge.className = `badge badge-${item.kind}`;
+        badge.textContent = KIND_LABELS[item.kind];
+        badge.title = item.source;
+        title.appendChild(badge);
+        const detail = document.createElement('div');
+        detail.className = 'item-detail';
+        detail.textContent = item.detail;
+        body.append(title, detail);
+
+        const amount = document.createElement('span');
+        amount.className = 'item-amount';
+        amount.textContent = money(item.amount);
+
+        li.append(icon, body, amount);
+        list.appendChild(li);
+    });
+
+    document.getElementById('budgetTotal').textContent = money(result.total);
+    document.getElementById('budgetPerPerson').textContent =
+        currentTrip.travelers > 1 ? `${money(result.perPerson)} per person` : '';
+    document.getElementById('budgetResult').hidden = false;
+}
+
+function setupBudgetControls() {
+    document.querySelectorAll('.tier-tabs button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentTier = btn.dataset.tier;
+            document.querySelectorAll('.tier-tabs button')
+                .forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+            renderBudget();
+        });
+    });
+    document.getElementById('currency').addEventListener('change', e => {
+        displayCurrency = e.target.value;
+        renderBudget();
+    });
+}
+
+/* Inputs changed after a result was shown: hide the stale result */
+function invalidateBudget() {
+    if (!currentTrip) return;
+    currentTrip = null;
+    document.getElementById('budgetResult').hidden = true;
 }

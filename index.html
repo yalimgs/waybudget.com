@@ -71,6 +71,40 @@
         </form>
 
         <section id="summaryDisplay" class="summary" aria-live="polite" hidden></section>
+
+        <section id="budgetResult" class="budget" aria-live="polite" hidden>
+            <div class="budget-head">
+                <h2>Estimated budget</h2>
+                <div class="budget-controls">
+                    <div class="tier-tabs" role="tablist" aria-label="Travel style">
+                        <button type="button" role="tab" data-tier="budget">Budget</button>
+                        <button type="button" role="tab" data-tier="standard" aria-selected="true">Standard</button>
+                        <button type="button" role="tab" data-tier="comfort">Comfort</button>
+                    </div>
+                    <label class="sr-only" for="currency">Currency</label>
+                    <select id="currency">
+                        <option value="USD">USD $</option>
+                        <option value="EUR">EUR €</option>
+                        <option value="GBP">GBP £</option>
+                        <option value="TRY">TRY ₺</option>
+                    </select>
+                </div>
+            </div>
+            <ul id="budgetItems" class="budget-items"></ul>
+            <div class="budget-total">
+                <div>
+                    <span class="total-label">Total</span>
+                    <span id="budgetPerPerson" class="per-person"></span>
+                </div>
+                <strong id="budgetTotal"></strong>
+            </div>
+            <p class="budget-note">
+                <span class="badge badge-live">Live</span> real prices ·
+                <span class="badge badge-estimate">Estimate</span> based on local price levels ·
+                <span class="badge badge-rough">Rough</span> placeholder until live prices are connected.
+                Attractions and entry fees are not included yet.
+            </p>
+        </section>
     </main>
 
     <footer class="site-footer">
@@ -78,6 +112,7 @@
     </footer>
 
     <script src="search.js"></script>
+    <script src="budget.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
