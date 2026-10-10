@@ -58,6 +58,7 @@ const BUDGET_MODEL = {
     // Premium = business class (multiple of economy, larger on long haul)
     flightFactor: { economy: 0.85, standard: 1 },
     businessFactor: [[1500, 2.5], [4000, 3], [Infinity, 4]],   // [up to km, × standard fare]
+    standardFallbackFactor: 1.25,     // too few fares seen: typical ≈ cheapest × 1.25
 
     defaultLevel: 0.5                 // countries with no price data
 };
@@ -142,12 +143,19 @@ function calculateBudget(trip, choices, live = {}) {
             info = describeFare(fl.economy);
             source = `Lowest of ${fl.fares} ${source.toLowerCase()}`;
         } else if (choices.flights === 'standard') {
-            perPerson = fl.standard.price;
-            info = describeFare(fl.standard);
-            source = `Typical (median) of ${fl.fares} ${source.toLowerCase()}`;
+            if (fl.standard) {
+                perPerson = fl.standard.price;
+                info = describeFare(fl.standard);
+                source = `Typical (median) of ${fl.fares} ${source.toLowerCase()}`;
+            } else {
+                perPerson = fl.economy.price * M.standardFallbackFactor;
+                kind = 'estimate'; info = 'Typical fare';
+                source = 'Too few fares seen; estimated from the lowest live fare';
+            }
         } else {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
-            perPerson = fl.standard.price * factor;
+            const std = fl.standard ? fl.standard.price : fl.economy.price * M.standardFallbackFactor;
+            perPerson = std * factor;
             kind = 'estimate'; info = 'Business class';
             source = 'Estimated from live economy fares';
         }
@@ -254,7 +262,7 @@ async function fetchLivePrices(trip, startIso, endIso) {
     const { origin, destination, travelers } = trip;
     const get = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
     const flightsUrl = `/api/flights?origin=${origin.a[0]}&destination=${destination.a[0]}` +
-                       `&depart=${startIso}&return=${endIso}&v=2`;
+                       `&depart=${startIso}&return=${endIso}&v=3`;
     const hotelsUrl = `/api/hotels?lat=${destination.lat}&lon=${destination.lon}` +
                       `&checkin=${startIso}&checkout=${endIso}&adults=${Math.min(2, travelers)}`;
     const [flights, hotel] = await Promise.all([get(flightsUrl), get(hotelsUrl)]);

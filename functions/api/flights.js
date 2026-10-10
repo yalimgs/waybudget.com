@@ -55,19 +55,26 @@ function summarize(list, depart, ret) {
             const len = (Date.parse(x.return_at.slice(0, 10)) - dep) / DAY;
             return { x, dDep: Math.abs(dep - want.dep) / DAY, dLen: Math.abs(len - want.len) };
         });
-    const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4, () => true];
-    let pool = [];
-    for (const ok of tiers) {
-        pool = all.filter(ok).map(f => f.x);
-        if (pool.length) break;
-    }
-    if (!pool.length) return null;
+    const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4,
+                   f => f.dLen <= 5, () => true];
+    const pools = tiers.map(ok => all.filter(ok).map(f => f.x).sort((a, b) => a.price - b.price));
 
-    pool.sort((a, b) => a.price - b.price);
-    const direct = pool.filter(f => f.transfers === 0 && f.return_transfers === 0);
-    const base = direct.length >= 2 ? direct : pool;
-    const median = base[Math.floor((base.length - 1) / 2)];
-    return { economy: fare(pool[0]), standard: fare(median), fares: pool.length };
+    // Economy: cheapest among the closest matches
+    const closest = pools.find(p => p.length);
+    if (!closest) return null;
+
+    // Standard: median needs a sample, so widen the date window until there
+    // are at least 5 fares; with fewer than 3 fares overall it is left out
+    // (the page then estimates it from Economy).
+    const sample = pools.find(p => p.length >= 5) || pools[pools.length - 1];
+    let standard = null;
+    if (sample.length >= 3) {
+        const direct = sample.filter(f => f.transfers === 0 && f.return_transfers === 0);
+        const base = direct.length >= 3 ? direct : sample;
+        standard = base[Math.floor((base.length - 1) / 2)];
+        if (standard.price < closest[0].price) standard = closest[0];
+    }
+    return { economy: fare(closest[0]), standard: standard && fare(standard), fares: sample.length };
 }
 
 export async function onRequestGet(context) {
