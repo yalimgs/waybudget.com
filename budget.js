@@ -279,7 +279,7 @@ function getJson(url) {
 
 function fetchFlights(trip) {
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
-                   `&depart=${trip.start}&return=${trip.end}&v=5`);
+                   `&depart=${trip.start}&return=${trip.end}&v=6`);
 }
 
 function fetchHotels(trip) {

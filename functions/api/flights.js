@@ -155,7 +155,12 @@ export async function onRequestGet(context) {
             }
             const result = summarize(list, depart, ret);
             if (!result) return { found: false };
-            return { found: true, match, currency: 'USD', ...result, business: await businessFare,
+            // Sanity check: a business fare far outside 1.3–6× the typical
+            // economy fare is more likely a data glitch than a real price
+            let biz = await businessFare;
+            const ref = result.standard.price;
+            if (biz && (biz.price < ref * 1.3 || biz.price > ref * 6)) biz = null;
+            return { found: true, match, currency: 'USD', ...result, business: biz,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
             return { error: e.message };
