@@ -5,6 +5,7 @@
 // by Aviasales), not a live booking quote.
 //   economy:  cheapest fare seen (any number of stops)
 //   standard: typical fare = median of fares seen, direct preferred
+//   business: cheapest business-class fare seen (null if none)
 // Exact dates are tried first; if nothing was seen for those dates, the
 // cheapest fares seen for the same months are returned (match: "month").
 // Responses are cached at the edge for 6 hours.
@@ -27,6 +28,39 @@ async function query(env, p) {
 }
 
 const DAY = 86400000;
+const LATEST = 'https://api.travelpayouts.com/aviasales/v3/get_latest_prices';
+
+/*
+ * Cheapest business-class round trip seen for the departure month, preferring
+ * trips close to the requested dates. Business data only exists on routes
+ * people search often; null when nothing was seen.
+ */
+async function business(env, origin, destination, depart, ret) {
+    const url = new URL(LATEST);
+    Object.entries({ origin, destination, beginning_of_period: depart.slice(0, 7) + '-01',
+                     period_type: 'month', one_way: 'false', trip_class: '1', currency: 'usd',
+                     sorting: 'price', limit: '100', page: '1' })
+        .forEach(([k, v]) => url.searchParams.set(k, v));
+    try {
+        const res = await fetch(url, { headers: { 'X-Access-Token': env.TRAVELPAYOUTS_TOKEN } });
+        if (!res.ok) return null;
+        const body = await res.json();
+        const want = { dep: Date.parse(depart), len: (Date.parse(ret) - Date.parse(depart)) / DAY };
+        const fares = (body.data || [])
+            .filter(f => Number(f.trip_class) === 1 && f.value > 0 && f.depart_date && f.return_date)
+            .map(f => {
+                const dep = Date.parse(f.depart_date);
+                const len = (Date.parse(f.return_date) - dep) / DAY;
+                return { f, near: Math.abs(dep - want.dep) / DAY <= 10 && Math.abs(len - want.len) <= 4 };
+            });
+        const pool = fares.some(x => x.near) ? fares.filter(x => x.near) : fares;
+        const best = pool.sort((a, b) => a.f.value - b.f.value)[0];
+        return best ? { price: best.f.value, transfers: best.f.number_of_changes ?? null,
+                        departureAt: best.f.depart_date, returnAt: best.f.return_date } : null;
+    } catch (e) {
+        return null;
+    }
+}
 
 function fare(f) {
     return {
@@ -63,10 +97,16 @@ function summarize(list, depart, ret) {
     const closest = pools.find(p => p.length);
     if (!closest) return null;
 
+    // "What most people buy": direct flights if there are enough of them,
+    // otherwise the fares with the fewest stops; middle of that range
+    // (ignores rock-bottom promos and last-minute extremes).
+    const stops = f => Math.max(f.transfers || 0, f.return_transfers || 0);
     const median = arr => {
-        const direct = arr.filter(f => f.transfers === 0 && f.return_transfers === 0);
-        const base = direct.length >= 3 ? direct : arr;
-        return base[Math.floor((base.length - 1) / 2)];
+        const fewest = Math.min(...arr.map(stops));
+        const direct = arr.filter(f => stops(f) === 0);
+        const base = direct.length >= 3 ? direct : arr.filter(f => stops(f) === fewest);
+        const pick = base.length >= 3 ? base : arr;
+        return pick[Math.floor((pick.length - 1) / 2)];
     };
     const economy = closest[0];
 
@@ -106,6 +146,7 @@ export async function onRequestGet(context) {
         try {
             // One request returns up to 100 fares (direct and with stops)
             let match = 'exact';
+            const businessFare = business(env, origin, destination, depart, ret);   // in parallel
             let list = await query(env, { origin, destination, departure_at: depart, return_at: ret });
             if (!list.length) {
                 match = 'month';
@@ -114,7 +155,7 @@ export async function onRequestGet(context) {
             }
             const result = summarize(list, depart, ret);
             if (!result) return { found: false };
-            return { found: true, match, currency: 'USD', ...result,
+            return { found: true, match, currency: 'USD', ...result, business: await businessFare,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
             return { error: e.message };

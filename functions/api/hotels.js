@@ -1,11 +1,10 @@
 // ============================================================================
 // GET /api/hotels?cc=IT&city=Rome&lat=41.89&lon=12.48&checkin=2026-11-03&checkout=2026-11-14&adults=2
 // Live hotel rates from LiteAPI for one room, around the city centre.
-// Returns price per room per night (USD) for three tiers, derived from the
-// spread of available hotels (no star categories needed):
-//   budget   ≈ 20th percentile of well-rated hotels
-//   standard ≈ median of well-rated hotels
-//   luxury   ≈ 80th percentile, preferring 4–5★ hotels
+// Returns price per room per night (USD) for three tiers:
+//   budget   = cheapest decent hotel (7+/10, 20+ reviews)
+//   standard = typical pick: median of the most-reviewed, well-rated 3–4★ hotels
+//   luxury   = cheapest hotel in the luxury segment (5★, else top-rated 4★)
 // plus one example hotel per tier. Cached at the edge for 1 hour.
 // ============================================================================
 import { cached, json, isDate } from '../_lib/cache.js';
@@ -27,7 +26,7 @@ async function fetchRates(env, p) {
         latitude: p.lat,
         longitude: p.lon,
         radius: 8000,
-        limit: 200,
+        limit: 300,
         maxRatesPerHotel: 1,
         includeHotelData: true,
         timeout: 8
@@ -96,20 +95,35 @@ export async function onRequestGet(context) {
             if (list.length < 3) return { found: false, count: list.length };
 
             const byPrice = arr => arr.slice().sort((a, b) => a.perNight - b.perNight);
-            // well-rated = 7+/10 with some reviews behind it
-            const rated = list.filter(h => h.rating >= 7 && h.reviews >= 20);
-            const pool = rated.length >= 5 ? rated : list;
-            const upscale = list.filter(h => (h.stars || 0) >= 4);
-            const luxuryPool = upscale.length >= 3 ? upscale : pool;
+            const minOf = arr => byPrice(arr)[0];
+            const medianOf = arr => byPrice(arr)[Math.floor((arr.length - 1) / 2)];
 
-            const tier = (arr, pct) => {
-                const s = byPrice(arr);
-                const h = percentile(s, pct);
-                return { perNight: h.perNight, example: h.name ? { name: h.name, stars: h.stars, rating: h.rating } : null };
-            };
+            // Budget: the cheapest hotel that is still decent (7+/10, 20+ reviews)
+            const decent = list.filter(h => h.rating >= 7 && h.reviews >= 20);
+            const budgetHotel = minOf(decent.length ? decent : list);
+
+            // Standard: what most people book — well-rated 3–4★ hotels, the more
+            // popular (most reviewed) half of them, middle price
+            let typical = list.filter(h => h.stars >= 3 && h.stars <= 4 && h.rating >= 8);
+            if (typical.length < 5) typical = decent.length >= 5 ? decent : list;
+            typical = typical.slice().sort((a, b) => b.reviews - a.reviews)
+                             .slice(0, Math.max(5, Math.ceil(typical.length / 2)));
+            const standardHotel = medianOf(typical);
+
+            // Luxury: the cheapest hotel in the luxury segment
+            const lux = [
+                list.filter(h => h.stars >= 5 && h.rating >= 8),
+                list.filter(h => h.stars >= 5),
+                list.filter(h => h.stars >= 4 && h.rating >= 9),
+                list.filter(h => h.stars >= 4 && h.rating >= 8.5)
+            ].find(arr => arr.length);
+            const luxuryHotel = lux ? minOf(lux) : byPrice(list)[Math.round((list.length - 1) * 0.8)];
+
+            const tier = h => ({ perNight: h.perNight,
+                                 example: h.name ? { name: h.name, stars: h.stars, rating: h.rating } : null });
             return {
                 found: true, currency: 'USD', nights, count: list.length,
-                budget: tier(pool, 0.2), standard: tier(pool, 0.5), luxury: tier(luxuryPool, 0.8),
+                budget: tier(budgetHotel), standard: tier(standardHotel), luxury: tier(luxuryHotel),
                 source: 'LiteAPI live rates'
             };
         } catch (e) {

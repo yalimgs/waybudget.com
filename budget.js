@@ -156,6 +156,10 @@ function calculateBudget(trip, choices, live = {}) {
                 kind = 'estimate'; info = 'Typical fare';
                 source = 'Too few fares seen; estimated from the lowest live fare';
             }
+        } else if (fl.business) {
+            perPerson = fl.business.price;
+            info = 'Business class';
+            source = 'Lowest business-class fare seen recently (Aviasales)';
         } else {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
             const std = fl.standard ? fl.standard.price : fl.economy.price * M.standardFallbackFactor;
@@ -275,12 +279,12 @@ function getJson(url) {
 
 function fetchFlights(trip) {
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
-                   `&depart=${trip.start}&return=${trip.end}&v=4`);
+                   `&depart=${trip.start}&return=${trip.end}&v=5`);
 }
 
 function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
-                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}`);
+                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=2`);
 }
 
 /* ------------------------------------------------------------- Currency -- */
