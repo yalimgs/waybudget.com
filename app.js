@@ -233,27 +233,45 @@ function submitTrip(event) {
     els.passengers.value = String(getTravelers());
     updateRouteSummary();
 
-    currentTrip = { origin, destination, nights: nightsBetween(start, end), travelers: getTravelers() };
-    liveData = { loading: true };
+    currentTrip = { origin, destination, start, end,
+                    nights: nightsBetween(start, end), travelers: getTravelers() };
+    liveData = {};
+    loadLivePrices();
     renderBudget();
-
-    const trip = currentTrip;
-    fetchLivePrices(trip, start, end).then(data => {
-        if (currentTrip !== trip) return;          // inputs changed meanwhile
-        liveData = { ...data, loading: false };
-        renderBudget();
-    });
     document.getElementById('budgetResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* --------------------------------------------------------------- Budget -- */
 
 let currentTrip = null;
-let liveData = {};
+let liveData = {};   // { flights, hotel } results + loadingFlights / loadingHotel flags
+
+/*
+ * Fetches live flight / hotel prices that are needed and not loaded yet.
+ * Items set to "None" are skipped (no API request) until chosen again.
+ */
+function loadLivePrices() {
+    const trip = currentTrip;
+    if (!trip) return;
+    const parts = [
+        ['flights', 'loadingFlights', fetchFlights],
+        ['hotel', 'loadingHotel', fetchHotels]
+    ];
+    for (const [key, flag, fetcher] of parts) {
+        if (choices[key] === 'none' || key in liveData || liveData[flag]) continue;
+        liveData[flag] = true;
+        fetcher(trip).then(result => {
+            if (currentTrip !== trip) return;      // inputs changed meanwhile
+            liveData[key] = result;
+            liveData[flag] = false;
+            renderBudget();
+        });
+    }
+}
 let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
-const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough', loading: 'Working…' };
+const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Rough', loading: 'Working…', none: '' };
 
 async function renderBudget() {
     if (!currentTrip) return;
@@ -265,7 +283,7 @@ async function renderBudget() {
 
     result.items.forEach(item => {
         const li = document.createElement('li');
-        li.className = 'budget-item';
+        li.className = 'budget-item' + (item.kind === 'none' ? ' excluded' : '');
 
         const icon = document.createElement('span');
         icon.className = 'item-icon';
@@ -303,6 +321,7 @@ async function renderBudget() {
                     if (choices[item.key] === value) return;
                     choices[item.key] = value;
                     syncPresetTabs();
+                    loadLivePrices();
                     renderBudget();
                 });
                 group.appendChild(btn);
@@ -331,6 +350,7 @@ function setupBudgetControls() {
         btn.addEventListener('click', () => {
             choices = { ...BUDGET_MODEL.presets[btn.dataset.tier] };
             syncPresetTabs();
+            loadLivePrices();
             renderBudget();
         });
     });

@@ -16,11 +16,11 @@
 const BUDGET_MODEL = {
     // Choices offered per line item: [key, label]
     options: {
-        flights:  [['economy', 'Economy'], ['standard', 'Standard'], ['premium', 'Premium']],
-        hotel:    [['budget', 'Budget'], ['standard', 'Standard'], ['luxury', 'Luxury']],
-        food:     [['budget', 'Street food'], ['standard', 'Casual'], ['luxury', 'Fine dining']],
-        transfer: [['transit', 'Public'], ['taxi', 'Taxi'], ['private', 'Private']],
-        local:    [['public', 'Public'], ['mixed', 'Mixed'], ['taxi', 'Taxi']]
+        flights:  [['economy', 'Economy'], ['standard', 'Standard'], ['premium', 'Premium'], ['none', 'None']],
+        hotel:    [['budget', 'Budget'], ['standard', 'Standard'], ['luxury', 'Luxury'], ['none', 'None']],
+        food:     [['budget', 'Street food'], ['standard', 'Casual'], ['luxury', 'Fine dining'], ['none', 'None']],
+        transfer: [['transit', 'Public'], ['taxi', 'Taxi'], ['private', 'Private'], ['none', 'None']],
+        local:    [['public', 'Public'], ['mixed', 'Mixed'], ['taxi', 'Taxi'], ['none', 'None']]
     },
     // Quick presets for the Budget / Standard / Luxury tabs
     presets: {
@@ -173,8 +173,8 @@ function calculateBudget(trip, choices, live = {}) {
         items.push({
             key: 'flights', label: 'Flights',
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind: live.loading ? 'loading' : 'rough',
-            source: live.loading ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'
+            amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
+            source: live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'
         });
     }
 
@@ -193,8 +193,8 @@ function calculateBudget(trip, choices, live = {}) {
         items.push({
             key: 'hotel', label: 'Accommodation',
             detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
-            amount: perNight * rooms * nights, kind: live.loading ? 'loading' : 'rough',
-            source: live.loading ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
+            amount: perNight * rooms * nights, kind: live.loadingHotel ? 'loading' : 'rough',
+            source: live.loadingHotel ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
         });
     }
 
@@ -234,6 +234,13 @@ function calculateBudget(trip, choices, live = {}) {
         source: 'Metro, bus, tram and short rides while sightseeing'
     });
 
+    // Items the traveller removed ("None"): shown, but not counted
+    for (const item of items) {
+        if (choices[item.key] === 'none') {
+            Object.assign(item, { amount: 0, detail: 'Not included', kind: 'none', source: '' });
+        }
+    }
+
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     return { items, total, perPerson: total / travelers };
 }
@@ -258,19 +265,22 @@ function describeFare(f) {
     return [airline, stopText].filter(Boolean).join(' · ');
 }
 
-/**
- * Fetches live flight and hotel prices for a trip (both edge-cached on our
- * side). Resolves to { flights, hotel }; either may be null on failure.
+/*
+ * Live flight / hotel prices for a trip (both edge-cached on our side).
+ * Each resolves to the API result, or null on failure / nothing found.
  */
-async function fetchLivePrices(trip, startIso, endIso) {
-    const { origin, destination, travelers } = trip;
-    const get = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
-    const flightsUrl = `/api/flights?origin=${origin.a[0]}&destination=${destination.a[0]}` +
-                       `&depart=${startIso}&return=${endIso}&v=4`;
-    const hotelsUrl = `/api/hotels?lat=${destination.lat}&lon=${destination.lon}` +
-                      `&checkin=${startIso}&checkout=${endIso}&adults=${Math.min(2, travelers)}`;
-    const [flights, hotel] = await Promise.all([get(flightsUrl), get(hotelsUrl)]);
-    return { flights: flights && !flights.error ? flights : null, hotel: hotel && !hotel.error ? hotel : null };
+function getJson(url) {
+    return fetch(url).then(r => (r.ok ? r.json() : null)).then(d => (d && !d.error ? d : null)).catch(() => null);
+}
+
+function fetchFlights(trip) {
+    return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
+                   `&depart=${trip.start}&return=${trip.end}&v=4`);
+}
+
+function fetchHotels(trip) {
+    return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
+                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}`);
 }
 
 /* ------------------------------------------------------------- Currency -- */
