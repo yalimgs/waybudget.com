@@ -17,7 +17,9 @@ Live: https://waybudget.com (Cloudflare, auto-deploys on push to `main`)
 | `data/prices.json` | Price level per country (USA = 1.0) + exchange rates for display |
 | `data/cities.json` | ~3,000 cities that have a scheduled-service airport, with IATA codes and coordinates |
 | `tools/build_cities.py` | Rebuilds `data/cities.json` |
-| `tools/build_prices.py` | Rebuilds `data/prices.json` |
+| `tools/refresh_prices.py` | Refreshes `data/prices.json` (price levels, fallback FX, US inflation factor) |
+| `tools/dump_geonames.js` | Exports GeoNames cities for `build_cities.py` |
+| `.github/workflows/refresh-data.yml` | Runs both refreshes on the first business day of every month |
 
 ## How the budget is estimated
 
@@ -37,6 +39,18 @@ Push to `main`; Cloudflare Pages deploys automatically (`functions/` becomes the
 Before committing CSS/JS changes run `python3 tools/bump_version.py` — it stamps
 `?v=<hash>` on the CSS/JS links in `index.html` so browsers fetch the new files
 instead of serving cached copies (Cloudflare lets browsers cache CSS/JS for 4 hours).
+
+## Data freshness
+
+| Data | Refreshed |
+|---|---|
+| Exchange rates (display) | Hourly check via `/api/fx` (source updates daily) |
+| Flight prices | Live, edge-cached 6 h |
+| Hotel prices | Live, edge-cached 1 h |
+| Country price levels, fallback FX, base-cost inflation | Monthly (GitHub Actions) |
+| Airport / city list | Monthly (GitHub Actions) |
+
+Run the monthly refresh by hand: GitHub → Actions → "Refresh data" → Run workflow.
 
 ## Rebuilding the city data
 

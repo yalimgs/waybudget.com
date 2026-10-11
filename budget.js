@@ -29,6 +29,9 @@ const BUDGET_MODEL = {
         luxury:   { flights: 'premium', hotel: 'luxury', food: 'luxury', transfer: 'private', local: 'taxi' }
     },
 
+    // All "US base" amounts are US prices of September 2026; they are scaled by
+    // US inflation since then (prices.json → baseFactor, refreshed monthly).
+
     // Hotel: price per room per night (US base), 2 travelers per room
     hotelNight:   { budget: 90, standard: 170, luxury: 380 },
     hotelExp: 0.7,
@@ -101,11 +104,16 @@ function distanceKm(a, b) {
 /**
  * Rough economy round-trip fare per person from distance alone.
  */
+/** US inflation since the base costs were set (refreshed monthly in prices.json). */
+function baseFactor() {
+    return (priceData && priceData.baseFactor) || 1;
+}
+
 function estimateFlightPerPerson(km, tier) {
     const f = BUDGET_MODEL.flight;
-    const fare = km <= f.longFrom
+    const fare = baseFactor() * (km <= f.longFrom
         ? f.base + km * f.shortPerKm
-        : f.base + f.longFrom * f.shortPerKm + (km - f.longFrom) * f.longPerKm;
+        : f.base + f.longFrom * f.shortPerKm + (km - f.longFrom) * f.longPerKm);
     if (tier === 'premium') {
         const [, factor] = BUDGET_MODEL.businessFactor.find(([maxKm]) => km <= maxKm);
         return fare * factor;
@@ -124,7 +132,9 @@ function calculateBudget(trip, choices, live = {}) {
     const M = BUDGET_MODEL;
     const { origin, destination, nights, travelers } = trip;
     const days = nights + 1;
+    // country price level × US inflation since the base costs were set
     const level = priceLevel(destination.cc);
+    const inf = baseFactor();
     const big = destination.l === 1;
     const rooms = Math.ceil(travelers / M.peoplePerRoom);
     const cars = Math.ceil(travelers / M.peoplePerCar);
@@ -193,7 +203,7 @@ function calculateBudget(trip, choices, live = {}) {
             source: `Live rates for your dates, ${live.hotel.count} hotels compared`
         });
     } else {
-        const perNight = M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
+        const perNight = inf * M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
             key: 'hotel', label: 'Hotel',
             detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
@@ -203,7 +213,7 @@ function calculateBudget(trip, choices, live = {}) {
     }
 
     // ---- Food
-    const foodDay = M.foodDay[choices.food] * level ** M.foodExp * (big ? M.bigCityFoodFactor : 1);
+    const foodDay = inf * M.foodDay[choices.food] * level ** M.foodExp * (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
         detail: `${travelers} × ${days} days · ~${money(foodDay)} per person/day`,
@@ -213,10 +223,10 @@ function calculateBudget(trip, choices, live = {}) {
 
     // ---- Airport transfers (both ways)
     const roadKm = Math.max(8, destination.d || 20) * M.roadFactor;
-    const taxiRide = (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
+    const taxiRide = inf * (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
     let transfer;
     if (choices.transfer === 'transit') {
-        const ride = M.transitTrip * level ** M.transitExp;
+        const ride = inf * M.transitTrip * level ** M.transitExp;
         transfer = { amount: ride * travelers * 2,
             detail: `Both ways · ${travelers} × ~${money(ride)} per ride` };
     } else {
@@ -230,7 +240,7 @@ function calculateBudget(trip, choices, live = {}) {
     });
 
     // ---- Getting around the city during the stay
-    const localDay = M.localDay[choices.local] * level ** M.localExp;
+    const localDay = inf * M.localDay[choices.local] * level ** M.localExp;
     items.push({
         key: 'local', label: 'Local transport',
         detail: `${travelers} × ${days} days · ~${money(localDay)} per person/day`,
