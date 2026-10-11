@@ -1,5 +1,6 @@
-# Monthly data refresh: runs on the first business day of every month
-# (09:00 Istanbul) and can be started by hand from the Actions tab.
+# Weekly data refresh: every Monday 09:00 Istanbul (06:00 UTC). If Monday's
+# run did not fully succeed, it is retried on Tuesday at the same time.
+# Can also be started by hand from the Actions tab.
 # Updates data/prices.json (price levels, fallback exchange rates, US inflation
 # factor for base costs) and data/cities.json (airports and cities), then
 # commits; Cloudflare Pages deploys the commit automatically.
@@ -7,38 +8,45 @@ name: Refresh data
 
 on:
   schedule:
-    - cron: '0 6 1-3 * *'     # days 1–3; the first step keeps only the first business day
+    - cron: '0 6 * * 1'       # Monday
+    - cron: '0 6 * * 2'       # Tuesday: retry only if Monday failed
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: First business day of the month?
+      - name: Should this run?
         id: when
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          d=$(date -u +%-d); dow=$(date -u +%u)   # dow: 1 = Monday … 7 = Sunday
-          run=no
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then run=yes
-          elif [ "$d" = 1 ] && [ "$dow" -le 5 ]; then run=yes
-          elif [ "$d" -le 3 ] && [ "$dow" = 1 ]; then run=yes   # 1st fell on a weekend
+          run=yes
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%u)" = 2 ]; then
+            since=$(date -u -d 'yesterday 00:00' +%Y-%m-%dT%H:%M:%SZ)
+            ok=$(gh api "repos/${{ github.repository }}/actions/workflows/refresh-data.yml/runs?status=success&created=>=$since" --jq '.total_count')
+            if [ "$ok" -gt 0 ]; then run=no; echo "Monday run succeeded, no retry needed"; fi
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "Day $d, weekday $dow -> run=$run"
 
       - uses: actions/checkout@v4
         if: steps.when.outputs.run == 'yes'
 
       - name: Refresh prices (price levels, fallback FX, US inflation)
+        id: prices
         if: steps.when.outputs.run == 'yes'
+        continue-on-error: true
         run: python3 tools/refresh_prices.py data/prices.json
 
       - name: Rebuild airport / city list
+        id: cities
         if: steps.when.outputs.run == 'yes'
+        continue-on-error: true
         run: |
           set -e
           work=$(mktemp -d)
@@ -60,5 +68,13 @@ jobs:
           git config user.name "waybudget-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data
-          git commit -m "Monthly data refresh $(date -u +%Y-%m-%d)"
+          git commit -m "Weekly data refresh $(date -u +%Y-%m-%d)"
           git push
+
+      # Saved what worked above; now mark the run failed if anything did not,
+      # so Tuesday's retry runs.
+      - name: Report partial failure
+        if: steps.when.outputs.run == 'yes' && (steps.prices.outcome == 'failure' || steps.cities.outcome == 'failure')
+        run: |
+          echo "prices: ${{ steps.prices.outcome }}, cities: ${{ steps.cities.outcome }}"
+          exit 1

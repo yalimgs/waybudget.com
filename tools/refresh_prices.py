@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Monthly refresh of data/prices.json (run by .github/workflows/refresh-data.yml).
+Weekly refresh of data/prices.json (run by .github/workflows/refresh-data.yml).
 
 What it updates
   level      Price level per country, USA = 1.0, brought forward to today:
@@ -176,10 +176,14 @@ def main():
         notes.append(f'baseFactor kept ({e!r})'[:300])
 
     out['generated'] = today
-    out['refreshLog'] = notes   # what the last monthly run did (kept for transparency)
+    out['refreshLog'] = notes   # what the last run did (kept for transparency)
     with open(OUT, 'w') as f:
         json.dump(out, f, separators=(',', ':'))
     log('prices.json: ' + '; '.join(notes))
+    # Non-zero exit if any part had to keep old values, so the workflow can
+    # retry the next day (the parts that did succeed are already saved).
+    if any('kept' in n for n in notes):
+        sys.exit(1)
 
 
 if __name__ == '__main__':

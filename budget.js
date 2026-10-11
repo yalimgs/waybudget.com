@@ -30,7 +30,7 @@ const BUDGET_MODEL = {
     },
 
     // All "US base" amounts are US prices of August 2026; they are scaled by
-    // US inflation since then (prices.json → baseFactor, refreshed monthly).
+    // US inflation since then (prices.json → baseFactor, refreshed weekly).
 
     // Hotel: price per room per night (US base), 2 travelers per room
     hotelNight:   { budget: 90, standard: 170, luxury: 380 },
@@ -104,7 +104,7 @@ function distanceKm(a, b) {
 /**
  * Rough economy round-trip fare per person from distance alone.
  */
-/** US inflation since the base costs were set (refreshed monthly in prices.json). */
+/** US inflation since the base costs were set (refreshed weekly in prices.json). */
 function baseFactor() {
     return (priceData && priceData.baseFactor) || 1;
 }
