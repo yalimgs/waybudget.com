@@ -1,0 +1,1 @@
+prices.json: fx 2026-10-11; levels 236 countries (World Bank PPP 2025 + CPI, FX 2026-10-11); food levels 199 countries (monthly restaurant index 35, monthly CPI 70, annual 94); baseFactor 1.0 (US CPI 2026-08 → 2026-08); foodBaseFactor 1.0 (US food away from home 2026-08 → 2026-08)
