@@ -29,7 +29,7 @@ const BUDGET_MODEL = {
         luxury:   { flights: 'premium', hotel: 'luxury', food: 'luxury', transfer: 'private', local: 'taxi' }
     },
 
-    // All "US base" amounts are US prices of September 2026; they are scaled by
+    // All "US base" amounts are US prices of August 2026; they are scaled by
     // US inflation since then (prices.json → baseFactor, refreshed monthly).
 
     // Hotel: price per room per night (US base), 2 travelers per room

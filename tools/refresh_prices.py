@@ -24,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DISPLAY = ['USD', 'EUR', 'GBP', 'TRY']
 
 # Base costs in budget.js are expressed in US prices of this month
-BASE_CPI_MONTH = '2026-09'
+BASE_CPI_MONTH = '2026-08'
 
 # GDP-wide price levels are unreliable where official and market exchange
 # rates diverge; manual values also fill countries the World Bank lacks.
