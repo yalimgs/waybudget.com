@@ -189,7 +189,7 @@ function calculateBudget(trip, choices, live = {}) {
         items.push({
             key: 'flights', label: 'Flights',
             detail: `${route} · ${info} · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind, source, link: bookingLink(fl.book, travelers)
+            amount: perPerson * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
         });
     } else {
         const perPerson = estimateFlightPerPerson(km, choices.flights);
@@ -198,7 +198,7 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
             amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
             source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
-            link: bookingLink(live.flights && live.flights.book, travelers)
+            link: bookingLink(live.flights && live.flights.book, travelers), linkLabel: 'See flights'
         });
     }
 
@@ -211,7 +211,8 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `${tn(rooms, '{n} room', '{n} rooms')} × ${tn(nights, '{n} night', '{n} nights')} · ` +
                     t('{p}/night', { p: money(ho.perNight) }) + ex,
             amount: ho.perNight * rooms * nights, kind: 'live',
-            source: t('Live rates for your dates, {n} hotels compared', { n: live.hotel.count })
+            source: t('Live rates for your dates, {n} hotels compared', { n: live.hotel.count }),
+            link: (ho.book && ho.book.url) || null, linkLabel: 'See hotel'
         });
     } else {
         const perNight = inf * M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
@@ -367,7 +368,7 @@ function fetchFlights(trip) {
 
 function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
-                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=6`);
+                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&travelers=${trip.travelers}&v=7`);
 }
 
 /* ------------------------------------------------------------- Currency -- */

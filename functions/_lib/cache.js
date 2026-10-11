@@ -16,9 +16,10 @@ export function json(data, status = 200, maxAge = 0) {
  * results marked `temporary`). Visitors asking the same
  * question within the TTL never reach the upstream API.
  */
-export async function cached(context, ttl, produce) {
+export async function cached(context, ttl, produce, ignore = []) {
     const url = new URL(context.request.url);
     url.searchParams.delete('raw');
+    for (const k of ignore) url.searchParams.delete(k);   // per-visitor params that don't change the data
     url.searchParams.sort();
     const key = new Request(url.toString());
     const cache = caches.default;

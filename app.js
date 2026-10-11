@@ -301,7 +301,7 @@ async function renderBudget() {
             link.href = item.link;
             link.target = '_blank';
             link.rel = 'sponsored noopener';
-            link.textContent = t('See flights') + ' →';
+            link.textContent = t(item.linkLabel || 'See flights') + ' →';
             body.appendChild(link);
         }
 

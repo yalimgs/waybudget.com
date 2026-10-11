@@ -5,12 +5,32 @@
 //   budget   = cheapest decent hotel (7+/10, 20+ reviews)
 //   standard = typical pick: median of the most-reviewed, well-rated 3–4★ hotels
 //   luxury   = cheapest hotel in the luxury segment (5★, else top-rated 4★)
-// plus one example hotel per tier. Cached at the edge for 1 hour.
+// plus one example hotel per tier, and where to book it (book.url, filled in
+// per request for the group size given in &travelers=). Rates are cached at
+// the edge for 1 hour; the booking links are added after the cache.
 // ============================================================================
 import { cached, json, isDate } from '../_lib/cache.js';
 
 const API = 'https://api.liteapi.travel/v3.0/hotels/rates';
 const TTL = 3600;
+
+// Our LiteAPI whitelabel booking site (bookings there earn our commission)
+const WHITELABEL = 'https://yal-m--z-a-layan-eycnx.nuitee.link';
+
+/* Rooms for a group: 2 adults per room, e.g. 5 travelers -> [2, 2, 1] */
+function rooms(travelers) {
+    const out = [];
+    for (let left = travelers; left > 0; left -= 2) out.push({ adults: Math.min(2, left) });
+    return out;
+}
+
+/* Whitelabel hotel page for the same dates and group */
+function bookingUrl(hotelId, p, travelers) {
+    if (!hotelId) return null;
+    const occ = btoa(JSON.stringify(rooms(travelers)));
+    return `${WHITELABEL}/hotels/${encodeURIComponent(hotelId)}?checkin=${p.checkin}` +
+           `&checkout=${p.checkout}&occupancies=${encodeURIComponent(occ)}`;
+}
 
 function nightsBetween(a, b) {
     return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -25,11 +45,11 @@ async function fetchRates(env, p) {
         occupancies: [{ adults: p.adults }],
         latitude: p.lat,
         longitude: p.lon,
-        radius: 8000,
-        limit: 300,
+        radius: 6000,
+        limit: 200,
         maxRatesPerHotel: 1,
         includeHotelData: true,
-        timeout: 8
+        timeout: 4             // seconds suppliers may take; slower ones are skipped
     };
     const res = await fetch(API, {
         method: 'POST',
@@ -75,7 +95,9 @@ export async function onRequestGet(context) {
     if (nights < 1 || nights > 60) return json({ error: 'invalid stay length' }, 400);
     if (!env.LITEAPI_KEY) return json({ error: 'Hotel API is not configured' }, 503);
 
-    return cached(context, TTL, async () => {
+    const travelers = Math.min(20, Math.max(1, parseInt(q.get('travelers'), 10) || p.adults));
+
+    const res = await cached(context, TTL, async () => {
         try {
             const r = await fetchRates(env, p);
             const info = new Map((r.hotels || []).map(h => [h.id, h]));
@@ -85,6 +107,7 @@ export async function onRequestGet(context) {
                 if (!total) continue;
                 const h = info.get(entry.hotelId) || entry.hotel || {};
                 list.push({
+                    id: entry.hotelId || h.id || null,
                     name: h.name || null,
                     stars: Number(h.stars ?? h.starRating) || null,
                     rating: Number(h.rating) || null,
@@ -133,7 +156,7 @@ export async function onRequestGet(context) {
                 : byPrice(list)[list.length - 1];
 
             const tier = h => ({ perNight: h.perNight,
-                                 example: h.name ? { name: h.name, stars: h.stars, rating: h.rating,
+                                 example: h.name ? { id: h.id, name: h.name, stars: h.stars, rating: h.rating,
                                                      lat: h.lat, lon: h.lon } : null });
             return {
                 found: true, currency: 'USD', nights, count: list.length,
@@ -143,5 +166,14 @@ export async function onRequestGet(context) {
         } catch (e) {
             return { error: e.message };
         }
-    });
+    }, ['travelers']);
+
+    // Add booking links for this visitor's group size (not part of the cache)
+    const data = await res.clone().json().catch(() => null);
+    if (!data || !data.found) return res;
+    for (const t of ['budget', 'standard', 'luxury']) {
+        const ex = data[t] && data[t].example;
+        if (ex) data[t].book = { url: bookingUrl(ex.id, p, travelers), provider: 'LiteAPI' };
+    }
+    return json(data, 200, TTL);
 }
