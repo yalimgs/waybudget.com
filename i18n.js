@@ -8,7 +8,8 @@
 const TR = {
     // Page
     'How much will your trip really cost?': 'Seyahatin gerçekte ne kadar tutar?',
-    'Flights, stay, food, transfers and sights': 'Uçak, konaklama, yemek, transfer ve gezi',
+    'Trip Budget Calculator': 'Seyahat Bütçesi Hesaplama',
+    'Flights, hotels, food and transfers': 'Uçak, otel, yemek ve transferler',
     'One total, from door to door': 'Kapıdan kapıya tek toplam',
     'From': 'Nereden', 'To': 'Nereye', 'Departure': 'Gidiş', 'Return': 'Dönüş', 'Travelers': 'Yolcu',
     'City or airport': 'Şehir veya havalimanı',
