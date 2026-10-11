@@ -54,7 +54,7 @@ function searchCities(query) {
 
         if (city.codes.includes(q)) score = 1000;                        // "ist"
         else if (city.nameNorm === q) score = 900;                       // "paris"
-        else if (city.keywords.includes(q)) score = 800;                 // "bali" -> Denpasar
+        else if (city.keywords.includes(q)) score = 900;                 // "bali" -> Denpasar, "roma" -> Rome
         else if (city.nameNorm.startsWith(q)) score = 700;               // "pari"
         else if (tokens.every(t => city.words.some(w => w.startsWith(t)))) {
             // every typed word starts a word in city/country/airport names
@@ -179,9 +179,11 @@ function setupAutocomplete(type) {
     input.addEventListener('blur', () => {
         // Accept an exact typed match without needing a click
         if (!tripData[type] && input.value.trim()) {
+            // Results are ranked, so "Roma" picks Rome, Italy (keyword) over Roma, Australia
+            const typed = normalizeText(input.value);
             const exact = searchCities(input.value)
-                .find(c => normalizeText(c.label) === normalizeText(input.value) ||
-                           c.nameNorm === normalizeText(input.value));
+                .find(c => normalizeText(c.label) === typed || c.nameNorm === typed ||
+                           c.keywords.includes(typed));
             if (exact) select(exact);
         }
         close();

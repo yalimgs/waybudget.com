@@ -13,6 +13,8 @@ Usage:
   python3 tools/build_cities.py <ourairports_dir> <geonames_cities.json> data/cities.json
 """
 import csv, json, math, os, re, sys, unicodedata
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from exonyms import EXONYMS   # Turkish / native city names (Roma, Londra, Wien...)
 from collections import defaultdict
 
 ap_dir, cities_path, out_path = sys.argv[1:4]
@@ -160,6 +162,8 @@ for ap in sorted(airports, key=lambda a: TYPE_RANK[a["type"]]):
     g["ap"].append((TYPE_RANK[ap["type"]], -(runway[ap["ident"]] + (100000 if ap["iata_code"].strip() in PRIMARY else 0)), code, ap["name"]))
     if code in ALIASES:
         g["k"].add(ALIASES[code])
+    if code in EXONYMS:
+        g["k"].add(EXONYMS[code])
 
 groups = {}
 for key, lst in clusters.items():
