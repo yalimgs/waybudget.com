@@ -12,7 +12,8 @@ export function json(data, status = 200, maxAge = 0) {
 
 /**
  * Serves from Cloudflare's edge cache when possible; otherwise runs `produce`
- * and caches successful results for `ttl` seconds. Visitors asking the same
+ * and caches successful results for `ttl` seconds (not errors or
+ * results marked `temporary`). Visitors asking the same
  * question within the TTL never reach the upstream API.
  */
 export async function cached(context, ttl, produce) {
@@ -27,7 +28,8 @@ export async function cached(context, ttl, produce) {
 
     const data = await produce();
     const response = json(data, 200, ttl);
-    if (!data.error) context.waitUntil(cache.put(key, response.clone()));
+    // Errors and temporary fallbacks are not cached, so they are retried
+    if (!data.error && !data.temporary) context.waitUntil(cache.put(key, response.clone()));
     return response;
 }
 

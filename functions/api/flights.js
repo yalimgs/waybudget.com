@@ -161,6 +161,10 @@ export async function onRequestGet(context) {
     }
     if (!env.TRAVELPAYOUTS_TOKEN) return json({ error: 'Flight API is not configured' }, 503);
 
+    // The booking link needs no upstream call, so it is returned even when
+    // fares can't be fetched (the page then shows an estimate + the link)
+    const book = bookingLink(origin, destination, depart, ret);
+
     return cached(context, TTL, async () => {
         try {
             // One request returns up to 100 fares (direct and with stops)
@@ -172,7 +176,6 @@ export async function onRequestGet(context) {
                 list = await query(env, { origin, destination,
                     departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
             }
-            const book = bookingLink(origin, destination, depart, ret);
             const result = summarize(list, depart, ret);
             if (!result) return { found: false, book };
             // Sanity check: a business fare far outside 1.3–6× the typical
@@ -183,7 +186,8 @@ export async function onRequestGet(context) {
             return { found: true, match, currency: 'USD', ...result, business: biz, book,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
-            return { error: e.message };
+            // temporary: not cached, so the next visitor tries Aviasales again
+            return { found: false, book, temporary: true, reason: e.message };
         }
     });
 }
