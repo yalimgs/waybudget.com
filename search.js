@@ -113,7 +113,7 @@ function setupAutocomplete(type) {
         if (!results.length) {
             const empty = document.createElement('li');
             empty.className = 'empty';
-            empty.textContent = 'No airport city found';
+            empty.textContent = t('No airport city found');
             list.appendChild(empty);
         }
         results.forEach((city, i) => {

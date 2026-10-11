@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     ['tripForm', 'startDate', 'endDate', 'passengers', 'tripLine',
      'formError', 'swapBtn', 'year'].forEach(id => { els[id] = document.getElementById(id); });
 
+    applyStaticText();
+    document.getElementById('langBtn').addEventListener('click', () => setLanguage(LANG === 'tr' ? 'en' : 'tr'));
+    document.addEventListener('lang:change', () => {
+        updateDateDisplays();
+        if (!els.formError.hidden && els.formError.dataset.key) els.formError.textContent = t(els.formError.dataset.key);
+        renderBudget();
+    });
+
     autocomplete.origin = setupAutocomplete('origin');
     autocomplete.destination = setupAutocomplete('destination');
 
@@ -65,7 +73,7 @@ function nightsBetween(startIso, endIso) {
 /** Human-friendly date, e.g. "3 April 2026". */
 function formatDate(isoDate) {
     const [y, m, d] = isoDate.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(y, m - 1, d).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /**
@@ -146,7 +154,7 @@ function updateRouteSummary() {
 function updateDateDisplays() {
     document.querySelectorAll('.date-display').forEach(span => {
         const value = document.getElementById(span.dataset.for).value;
-        span.textContent = value ? formatDate(value) : 'Select date';
+        span.textContent = value ? formatDate(value) : t('Select date');
         span.classList.toggle('empty', !value);
     });
 }
@@ -154,15 +162,15 @@ function updateDateDisplays() {
 /* One-line trip summary shown under the budget title */
 function tripLineText(trip) {
     const nights = trip.nights;
-    const people = `${trip.travelers} traveler${trip.travelers === 1 ? '' : 's'}`;
     return `${trip.origin.n} → ${trip.destination.n} · ${formatDate(trip.start)} – ${formatDate(trip.end)} · ` +
-           `${nights} night${nights === 1 ? '' : 's'} · ${people}`;
+           `${tn(nights, '{n} night', '{n} nights')} · ${tn(trip.travelers, '{n} traveler', '{n} travelers')}`;
 }
 
 /* ----------------------------------------------------------- Submission -- */
 
 function showError(message, fieldIds = []) {
-    els.formError.textContent = message;
+    els.formError.dataset.key = message;          // English key, re-translated on language change
+    els.formError.textContent = t(message);
     els.formError.hidden = false;
     fieldIds.forEach(id => document.getElementById(id).classList.add('invalid'));
     if (fieldIds[0]) document.getElementById(fieldIds[0]).focus();
@@ -277,11 +285,11 @@ async function renderBudget() {
         body.className = 'item-body';
         const title = document.createElement('div');
         title.className = 'item-title';
-        title.textContent = item.label + ' ';
+        title.textContent = t(item.label) + ' ';
         const badge = document.createElement('span');
         badge.className = `badge badge-${item.kind}`;
-        badge.textContent = KIND_LABELS[item.kind];
-        badge.title = item.source;
+        badge.textContent = KIND_LABELS[item.kind] ? t(KIND_LABELS[item.kind]) : '';
+        badge.title = item.source || '';
         title.appendChild(badge);
         const detail = document.createElement('div');
         detail.className = 'item-detail';
@@ -294,11 +302,11 @@ async function renderBudget() {
             const group = document.createElement('div');
             group.className = 'item-choices';
             group.setAttribute('role', 'group');
-            group.setAttribute('aria-label', `${item.label} option`);
+            group.setAttribute('aria-label', t('{label} option', { label: t(item.label) }));
             options.forEach(([value, label]) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.textContent = label;
+                btn.textContent = t(label);
                 btn.setAttribute('aria-pressed', String(value === choices[item.key]));
                 btn.addEventListener('click', () => {
                     if (choices[item.key] === value) return;
@@ -325,7 +333,7 @@ async function renderBudget() {
     document.getElementById('fxNote').textContent = fxNoteText();
     document.getElementById('budgetTotal').textContent = money(result.total);
     document.getElementById('budgetPerPerson').textContent =
-        currentTrip.travelers > 1 ? `${money(result.perPerson)} per person` : '';
+        currentTrip.travelers > 1 ? t('{p} per person', { p: money(result.perPerson) }) : '';
     document.getElementById('budgetResult').hidden = false;
 }
 

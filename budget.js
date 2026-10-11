@@ -138,44 +138,49 @@ function calculateBudget(trip, choices, live = {}) {
     const big = destination.l === 1;
     const rooms = Math.ceil(travelers / M.peoplePerRoom);
     const cars = Math.ceil(travelers / M.peoplePerCar);
-    const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+
     const items = [];
 
     // ---- Flights
     const km = distanceKm(origin, destination);
-    const route = `Round trip ${origin.a[0]} ⇄ ${destination.a[0]}`;
+    const route = t('Round trip {a} ⇄ {b}', { a: origin.a[0], b: destination.a[0] });
+    // "closest fare seen: 10–12 Nov" when a fare is not for the exact dates asked
+    const dateNote = f => {
+        if (!f || !f.departureAt || !f.returnAt) return '';
+        const dep = f.departureAt.slice(0, 10), ret = f.returnAt.slice(0, 10);
+        if (dep === trip.start && ret === trip.end) return '';
+        return ' · ' + t('closest fare seen: {dates}', { dates: shortRange(dep, ret) });
+    };
     const fl = live.flights && live.flights.found ? live.flights : null;
     if (fl) {
-        const seen = fl.match === 'month' ? 'Fares seen recently for these months' : 'Fares seen recently for these dates';
-        let perPerson, kind = 'live', info, source = `${seen} (Aviasales)`;
+        let perPerson, kind = 'live', info, source;
         if (choices.flights === 'economy') {
             perPerson = fl.economy.price;
-            info = describeFare(fl.economy);
-            source = `Lowest of ${fl.fares} ${source.toLowerCase()}`;
+            info = describeFare(fl.economy) + dateNote(fl.economy);
+            source = t('Lowest of {n} fares seen recently (Aviasales)', { n: fl.fares });
         } else if (choices.flights === 'standard') {
             if (fl.standard && !fl.standard.derived) {
                 perPerson = fl.standard.price;
-                info = describeFare(fl.standard);
-                source = `Typical (median) of ${fl.fares} ${source.toLowerCase()}`;
-            } else if (fl.standard) {
-                perPerson = fl.standard.price;
-                kind = 'estimate'; info = 'Typical fare';
-                source = 'Lowest live fare + typical markup seen on this route';
+                info = describeFare(fl.standard) + dateNote(fl.standard);
+                source = t('Typical (median) of {n} fares seen recently (Aviasales)', { n: fl.fares });
             } else {
-                perPerson = fl.economy.price * M.standardFallbackFactor;
-                kind = 'estimate'; info = 'Typical fare';
-                source = 'Too few fares seen; estimated from the lowest live fare';
+                perPerson = fl.standard ? fl.standard.price : fl.economy.price * M.standardFallbackFactor;
+                kind = 'estimate';
+                info = t('Typical fare') + ' · ' + t('few fares seen for these dates');
+                source = t(fl.standard ? 'Lowest live fare + typical markup seen on this route'
+                                       : 'Too few fares seen; estimated from the lowest live fare');
             }
         } else if (fl.business) {
             perPerson = fl.business.price;
-            info = 'Business class' + (fl.business.transfers != null ? ` · ${stopsText(fl.business.transfers)}` : '');
-            source = 'Lowest business-class fare seen recently (Aviasales)';
+            info = t('Business class') + (fl.business.transfers != null ? ` · ${stopsText(fl.business.transfers)}` : '') +
+                   dateNote(fl.business);
+            source = t('Lowest business-class fare seen recently (Aviasales)');
         } else {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
             const std = fl.standard ? fl.standard.price : fl.economy.price * M.standardFallbackFactor;
             perPerson = std * factor;
-            kind = 'estimate'; info = 'Business class';
-            source = 'Estimated from live economy fares';
+            kind = 'estimate'; info = t('Business class');
+            source = t('Estimated from live economy fares');
         }
         items.push({
             key: 'flights', label: 'Flights',
@@ -188,27 +193,29 @@ function calculateBudget(trip, choices, live = {}) {
             key: 'flights', label: 'Flights',
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
             amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
-            source: live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'
+            source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)')
         });
     }
 
     // ---- Accommodation
     const ho = live.hotel && live.hotel.found ? live.hotel[choices.hotel] : null;
     if (ho) {
-        const ex = ho.example ? ` · e.g. ${ho.example.name}` : '';
+        const ex = ho.example ? ' · ' + t('e.g. {name}', { name: ho.example.name }) : '';
         items.push({
             key: 'hotel', label: 'Hotel',
-            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ${money(ho.perNight)}/night${ex}`,
+            detail: `${tn(rooms, '{n} room', '{n} rooms')} × ${tn(nights, '{n} night', '{n} nights')} · ` +
+                    t('{p}/night', { p: money(ho.perNight) }) + ex,
             amount: ho.perNight * rooms * nights, kind: 'live',
-            source: `Live rates for your dates, ${live.hotel.count} hotels compared`
+            source: t('Live rates for your dates, {n} hotels compared', { n: live.hotel.count })
         });
     } else {
         const perNight = inf * M.hotelNight[choices.hotel] * level ** M.hotelExp * (big ? M.bigCityHotelFactor : 1);
         items.push({
             key: 'hotel', label: 'Hotel',
-            detail: `${plural(rooms, 'room')} × ${plural(nights, 'night')} · ~${money(perNight)}/night`,
+            detail: `${tn(rooms, '{n} room', '{n} rooms')} × ${tn(nights, '{n} night', '{n} nights')} · ~` +
+                    t('{p}/night', { p: money(perNight) }),
             amount: perNight * rooms * nights, kind: live.loadingHotel ? 'loading' : 'rough',
-            source: live.loadingHotel ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)'
+            source: t(live.loadingHotel ? 'Loading live hotel rates' : 'Price-level estimate (no live rates found)')
         });
     }
 
@@ -218,9 +225,9 @@ function calculateBudget(trip, choices, live = {}) {
     const foodDay = inf * M.foodDay[choices.food] * foodLevel * (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
-        detail: `${travelers} × ${days} days · ~${money(foodDay)} per person/day`,
+        detail: t('{t} × {d} days · ~{p} per person/day', { t: travelers, d: days, p: money(foodDay) }),
         amount: foodDay * travelers * days, kind: 'estimate',
-        source: 'Based on the destination country\'s price level'
+        source: t('Based on the destination country\'s restaurant prices')
     });
 
     // ---- Airport transfers (both ways)
@@ -239,7 +246,7 @@ function calculateBudget(trip, choices, live = {}) {
         transferTo = hotelPick.name;
     } else {
         roadKm = destination.rk || Math.max(8, destination.d || 20) * M.roadFactor;
-        transferTo = 'city centre';
+        transferTo = t('city centre');
     }
     const minPerKm = destination.rk && destination.rm ? destination.rm / destination.rk : null;
     const driveMin = minPerKm ? Math.round(roadKm * minPerKm) : null;
@@ -248,35 +255,37 @@ function calculateBudget(trip, choices, live = {}) {
     if (choices.transfer === 'transit') {
         const ride = inf * M.transitTrip * level ** M.transitExp;
         transfer = { amount: ride * travelers * 2,
-            detail: `${destination.a[0]} → ${transferTo} · both ways · ${travelers} × ~${money(ride)} per ride` };
+            detail: `${destination.a[0]} → ${transferTo} · ${t('both ways')} · ${travelers} × ` +
+                    t('~{p} per ride', { p: money(ride) }) };
     } else {
         const ride = taxiRide * (choices.transfer === 'private' ? M.privateFactor : 1);
         transfer = { amount: ride * cars * 2,
             detail: `${destination.a[0]} → ${transferTo} · ~${Math.round(roadKm)} km` +
-                    (driveMin ? ` (~${driveMin} min)` : '') + ` · both ways · ${plural(cars, 'car')} · ~${money(ride)} per ride` };
+                    (driveMin ? ' ' + t('(~{m} min)', { m: driveMin }) : '') +
+                    ` · ${t('both ways')} · ${tn(cars, '{n} car', '{n} cars')} · ` + t('~{p} per ride', { p: money(ride) }) };
     }
     items.push({
         key: 'transfer', label: 'Airport transfers', ...transfer, kind: 'estimate',
         source: hotelPick
-            ? `Distance to the example hotel, estimated from this city's road network; taxi fares estimated`
+            ? t('Distance to the example hotel, estimated from this city\'s road network; taxi fares estimated')
             : destination.rk
-                ? `${destination.a[0]} → city centre: ${Math.round(destination.rk)} km by road (OpenStreetMap)`
-                : `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre (straight line)`
+                ? t('{c} → city centre: {k} km by road (OpenStreetMap)', { c: destination.a[0], k: Math.round(destination.rk) })
+                : t('{c} is ~{k} km from the city centre (straight line)', { c: destination.a[0], k: Math.round(destination.d || 20) })
     });
 
     // ---- Getting around the city during the stay
     const localDay = inf * M.localDay[choices.local] * level ** M.localExp;
     items.push({
         key: 'local', label: 'Local transport',
-        detail: `${travelers} × ${days} days · ~${money(localDay)} per person/day`,
+        detail: t('{t} × {d} days · ~{p} per person/day', { t: travelers, d: days, p: money(localDay) }),
         amount: localDay * travelers * days, kind: 'estimate',
-        source: 'Metro, bus, tram and short rides while sightseeing'
+        source: t('Metro, bus, tram and short rides while sightseeing')
     });
 
     // Items the traveller removed ("None"): shown, but not counted
     for (const item of items) {
         if (choices[item.key] === 'none') {
-            Object.assign(item, { amount: 0, detail: 'Not included', kind: 'none', source: '' });
+            Object.assign(item, { amount: 0, detail: t('Not included'), kind: 'none', source: '' });
         }
     }
 
@@ -298,7 +307,17 @@ const AIRLINES = {
 };
 
 function stopsText(n) {
-    return n === 0 ? 'Direct' : `${n} stop${n > 1 ? 's' : ''}`;
+    return n === 0 ? t('Direct') : tn(n, '{n} stop', '{n} stops');
+}
+
+/* "10–12 Nov" or "28 Nov – 2 Dec" in the current language */
+function shortRange(depIso, retIso) {
+    const d = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
+    const a = d(depIso), b = d(retIso), loc = dateLocale();
+    const mon = x => x.toLocaleDateString(loc, { month: 'short' });
+    return a.getMonth() === b.getMonth()
+        ? `${a.getDate()}–${b.getDate()} ${mon(b)}`
+        : `${a.getDate()} ${mon(a)} – ${b.getDate()} ${mon(b)}`;
 }
 
 /* "Pegasus · Direct", or "Pegasus · 1 stop out, direct back" when the legs differ */
@@ -308,7 +327,7 @@ function describeFare(f) {
     let stops = '';
     if (out != null && back != null) {
         stops = out === back ? stopsText(out)
-            : `${stopsText(out)} out, ${stopsText(back).toLowerCase()} back`;
+            : t('{out} out, {back} back', { out: stopsText(out), back: stopsText(back).toLocaleLowerCase(dateLocale()) });
     } else if (out != null) {
         stops = stopsText(out);
     }
@@ -345,8 +364,8 @@ function fxNoteText() {
     let when = '';
     if (priceData.fxDate) {
         const [y, m, d] = priceData.fxDate.split('-').map(Number);
-        when = ' · rates of ' + new Date(y, m - 1, d)
-            .toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        when = t(' · rates of {date}', { date: new Date(y, m - 1, d)
+            .toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' }) });
     }
     return `1 USD = ${rate.toLocaleString('en', { maximumFractionDigits: 4 })} ${displayCurrency}${when}`;
 }

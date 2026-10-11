@@ -21,36 +21,37 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=7a05e1f140">
+    <link rel="stylesheet" href="style.css?v=92757dbca0">
 </head>
 <body>
     <header class="hero">
+        <button type="button" id="langBtn" class="lang-btn">Türkçe</button>
         <div class="brand">
             <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#FFA500"/><path fill="#1E6B35" d="M54.65 25.79L55.26 25.79L55.26 25.93L68.92 51L74.32 31.80L74.32 31.80Q74.87 29.76 73.98 28.66Q73.09 27.57 71.72 27.57L71.72 27.57L71.11 27.57L71.11 26.89L86 26.89L86 27.57L85.45 27.57Q83.88 27.57 82.04 28.53L82.04 28.53Q80.40 29.41 79.58 31.33L79.58 31.33L67.97 68.62L67.62 69.72L67.08 72.59Q67.08 72.65 67.08 72.72L67.08 72.72Q66.80 74.50 67.01 76.21L67.01 76.21L66.33 76.21L50.55 46.49L39.75 68.62L39.34 69.72Q38.87 70.88 38.42 72.59Q37.98 74.29 37.91 76.21L37.91 76.21L37.29 76.21L20.49 31.60Q19.60 29.48 17.89 28.53L17.89 28.53Q16.12 27.57 14.55 27.57L14.55 27.57L14.00 27.57L14.00 26.89L38.52 26.89L38.52 27.57L37.91 27.57Q36.61 27.57 35.62 28.66Q34.63 29.76 35.38 31.80L35.38 31.80L35.38 31.80L42.83 50.39L54.65 25.79Z"/></svg>
             <span class="brand-name">WayBudget</span>
         </div>
-        <h1>How much will your trip really cost?</h1>
-        <p class="tagline">Flights, stay, food, transfers and sights<br>One total, from door to door</p>
+        <h1 data-i18n="How much will your trip really cost?">How much will your trip really cost?</h1>
+        <p class="tagline"><span data-i18n="Flights, stay, food, transfers and sights">Flights, stay, food, transfers and sights</span><br><span data-i18n="One total, from door to door">One total, from door to door</span></p>
     </header>
 
     <main class="container">
         <form id="tripForm" class="card" novalidate autocomplete="off">
             <div class="route-row">
                 <div class="field city-field">
-                    <label for="origin">From</label>
-                    <input type="text" id="origin" placeholder="City or airport"
+                    <label for="origin" data-i18n="From">From</label>
+                    <input type="text" id="origin" placeholder="City or airport" data-i18n-ph="City or airport"
                            role="combobox" aria-autocomplete="list" aria-expanded="false"
                            aria-controls="originResults" spellcheck="false">
                     <ul id="originResults" class="city-results" role="listbox"></ul>
                 </div>
 
-                <button type="button" id="swapBtn" class="swap-btn" aria-label="Swap origin and destination" title="Swap">
+                <button type="button" id="swapBtn" class="swap-btn" aria-label="Swap origin and destination" data-i18n-aria="Swap origin and destination" title="Swap">
                     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
 
                 <div class="field city-field">
-                    <label for="destination">To</label>
-                    <input type="text" id="destination" placeholder="City or airport"
+                    <label for="destination" data-i18n="To">To</label>
+                    <input type="text" id="destination" placeholder="City or airport" data-i18n-ph="City or airport"
                            role="combobox" aria-autocomplete="list" aria-expanded="false"
                            aria-controls="destinationResults" spellcheck="false">
                     <ul id="destinationResults" class="city-results" role="listbox"></ul>
@@ -59,46 +60,46 @@
 
             <div class="detail-row">
                 <div class="field">
-                    <label for="startDate">Departure</label>
+                    <label for="startDate" data-i18n="Departure">Departure</label>
                     <div class="date-input">
                         <input type="date" id="startDate">
                         <span class="date-display" data-for="startDate" aria-hidden="true">Select date</span>
                     </div>
                 </div>
                 <div class="field">
-                    <label for="endDate">Return</label>
+                    <label for="endDate" data-i18n="Return">Return</label>
                     <div class="date-input">
                         <input type="date" id="endDate">
                         <span class="date-display" data-for="endDate" aria-hidden="true">Select date</span>
                     </div>
                 </div>
                 <div class="field travelers-field">
-                    <label for="passengers">Travelers</label>
+                    <label for="passengers" data-i18n="Travelers">Travelers</label>
                     <div class="stepper">
-                        <button type="button" class="step-btn" data-step="-1" aria-label="Fewer travelers">&minus;</button>
+                        <button type="button" class="step-btn" data-step="-1" aria-label="Fewer travelers" data-i18n-aria="Fewer travelers">&minus;</button>
                         <input type="text" id="passengers" value="1" inputmode="numeric" maxlength="2" aria-describedby="travelersHint">
-                        <button type="button" class="step-btn" data-step="1" aria-label="More travelers">+</button>
+                        <button type="button" class="step-btn" data-step="1" aria-label="More travelers" data-i18n-aria="More travelers">+</button>
                     </div>
                 </div>
             </div>
-            <p id="travelersHint" class="sr-only">Between 1 and 20 travelers.</p>
+            <p id="travelersHint" class="sr-only" data-i18n="Between 1 and 20 travelers.">Between 1 and 20 travelers.</p>
 
             <p id="formError" class="form-error" role="alert" hidden></p>
 
-            <button type="submit" class="primary-btn">Calculate my budget</button>
+            <button type="submit" class="primary-btn" data-i18n="Calculate my budget">Calculate my budget</button>
         </form>
 
         <section id="budgetResult" class="budget" aria-live="polite" hidden>
             <div class="budget-head">
                 <div>
-                    <h2>Your trip budget</h2>
+                    <h2 data-i18n="Your trip budget">Your trip budget</h2>
                     <p id="tripLine" class="trip-line"></p>
                 </div>
                 <div class="budget-controls">
                     <div class="tier-tabs" role="group" aria-label="Quick preset for all items">
-                        <button type="button" data-tier="budget">Budget</button>
-                        <button type="button" data-tier="standard" aria-pressed="true">Standard</button>
-                        <button type="button" data-tier="luxury">Luxury</button>
+                        <button type="button" data-tier="budget" data-i18n="Budget">Budget</button>
+                        <button type="button" data-tier="standard" aria-pressed="true" data-i18n="Standard">Standard</button>
+                        <button type="button" data-tier="luxury" data-i18n="Luxury">Luxury</button>
                     </div>
                     <label class="sr-only" for="currency">Currency</label>
                     <select id="currency">
@@ -112,30 +113,35 @@
             <ul id="budgetItems" class="budget-items"></ul>
             <div class="budget-total">
                 <div>
-                    <span class="total-label">Total</span>
+                    <span class="total-label" data-i18n="Total">Total</span>
                     <span id="budgetPerPerson" class="per-person"></span>
                     <span id="fxNote" class="per-person fx-note"></span>
                 </div>
                 <strong id="budgetTotal"></strong>
             </div>
+            <p class="not-included">
+                <strong data-i18n="Not included:">Not included:</strong>
+                <span data-i18n="visa · travel insurance · baggage fees · city/tourist tax · tours &amp; entry fees · SIM / roaming · shopping">visa · travel insurance · baggage fees · city/tourist tax · tours &amp; entry fees · SIM / roaming · shopping</span>
+            </p>
             <p class="budget-note">
-                <span class="badge badge-live">Live</span> Real prices ·
-                <span class="badge badge-estimate">Estimate</span> Based on local price levels ·
-                <span class="badge badge-rough">Approx.</span> Fallback when no live price is available
+                <span class="badge badge-live" data-i18n="Live">Live</span> <span data-i18n="Real prices">Real prices</span> ·
+                <span class="badge badge-estimate" data-i18n="Estimate">Estimate</span> <span data-i18n="Based on local price levels">Based on local price levels</span> ·
+                <span class="badge badge-rough" data-i18n="Approx.">Approx.</span> <span data-i18n="Fallback when no live price is available">Fallback when no live price is available</span>
             </p>
         </section>
     </main>
 
     <footer class="site-footer">
         <p>&copy; <span id="year"></span> WayBudget &middot;
-           Data: <a href="https://ourairports.com/" rel="noopener">OurAirports</a>,
+           <span data-i18n="Data:">Data:</span> <a href="https://ourairports.com/" rel="noopener">OurAirports</a>,
            <a href="https://www.geonames.org/" rel="noopener">GeoNames</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>),
            <a href="https://data.worldbank.org/" rel="noopener">World Bank</a> (<a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>) &middot;
-           Prices: <a href="https://www.aviasales.com/" rel="noopener">Aviasales</a>, <a href="https://www.liteapi.travel/" rel="noopener">LiteAPI</a></p>
+           <span data-i18n="Prices:">Prices:</span> <a href="https://www.aviasales.com/" rel="noopener">Aviasales</a>, <a href="https://www.liteapi.travel/" rel="noopener">LiteAPI</a></p>
     </footer>
 
-    <script src="search.js?v=37cc40c3ac"></script>
-    <script src="budget.js?v=863acaf974"></script>
-    <script src="app.js?v=78a60c566c"></script>
+    <script src="i18n.js?v=0bfe4392e2"></script>
+    <script src="search.js?v=1f36100183"></script>
+    <script src="budget.js?v=7e0feb3d41"></script>
+    <script src="app.js?v=fe1f960c2e"></script>
 </body>
 </html>

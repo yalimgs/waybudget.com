@@ -31,6 +31,7 @@ body {
 
 /* ---------------------------------------------------------------- Hero -- */
 .hero {
+    position: relative;
     background:
         radial-gradient(circle at 85% 20%, rgba(242, 165, 65, .35), transparent 40%),
         linear-gradient(135deg, #0b4f57 0%, #0d6e6e 60%, #128a7e 100%);
@@ -38,6 +39,24 @@ body {
     padding: 28px 20px 120px;
     text-align: center;
 }
+/* Language switch, top-right corner of the page */
+.lang-btn {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.lang-btn:hover { background: rgba(255, 255, 255, .25); }
+
 .brand {
     display: inline-flex;
     align-items: center;
@@ -69,6 +88,8 @@ body {
 
 /* ---------------------------------------------------------- Container -- */
 .container {
+    position: relative;   /* above the hero, which is positioned for the language button */
+    z-index: 1;
     max-width: 880px;
     margin: -88px auto 0;
     padding: 0 16px;
@@ -408,6 +429,16 @@ input.invalid {
 .fx-note { display: block; font-size: 12px; }
 .fx-note:empty { display: none; }
 .budget-total strong { font-size: 28px; letter-spacing: -.02em; color: var(--brand); }
+.not-included {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f6f4ef;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+}
+.not-included strong { color: var(--ink); }
 .budget-note {
     margin: 14px 0 0;
     font-size: 12px;
@@ -452,5 +483,5 @@ input.invalid {
     .budget-item { grid-template-columns: 32px 1fr auto; gap: 10px; }
     .item-icon { width: 32px; height: 32px; font-size: 16px; }
     .item-choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
-    .item-choices button { padding: 6px 2px; font-size: 12px; }
+    .item-choices button { padding: 6px 2px; font-size: 12px; white-space: normal; line-height: 1.2; }
 }
