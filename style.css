@@ -337,9 +337,9 @@ input.invalid {
     cursor: pointer;
 }
 .tier-tabs button[aria-pressed="true"] {
-    background: #fff;
-    color: var(--brand);
-    box-shadow: 0 1px 3px rgba(15, 36, 48, .12);
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(13, 110, 110, .35);
 }
 #currency {
     height: 36px;
@@ -377,17 +377,19 @@ input.invalid {
 .item-link:focus,
 .item-link:active {
     display: inline-block;
-    margin-top: 4px;
+    margin-top: 6px;
+    padding: 5px 12px;
+    border: 0 !important;
+    border-radius: 999px;
+    background: #0a84ff !important;
+    color: #fff;
     font-size: 13px;
     font-weight: 700;
-    color: var(--brand);
     text-decoration: none;
-    background: none !important;
-    border: 0 !important;
-    box-shadow: none !important;
+    box-shadow: 0 2px 8px rgba(10, 132, 255, .4) !important;
     -webkit-tap-highlight-color: transparent;
 }
-.item-link:hover { text-decoration: underline; }
+.item-link:hover { background: #0070e0 !important; }
 .item-choices {
     grid-column: 2 / -1;
     justify-self: start;
@@ -414,9 +416,9 @@ input.invalid {
 .item-choices button:hover { color: var(--ink); }
 
 .item-choices button[aria-pressed="true"] {
-    background: #fff;
-    color: var(--brand);
-    box-shadow: 0 1px 3px rgba(15, 36, 48, .12);
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(13, 110, 110, .35);
 }
 .item-amount { font-weight: 700; font-size: 16px; white-space: nowrap; }
 .badge {
