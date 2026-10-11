@@ -1,0 +1,28 @@
+# TEMPORARY: test run of the new food price levels on a branch (no commit).
+name: Test food levels
+on:
+  push:
+    branches: [food-indexes]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run refresh on a copy
+        run: |
+          cp data/prices.json /tmp/old.json
+          cp data/prices.json /tmp/new.json
+          python3 tools/refresh_prices.py /tmp/new.json || echo "exit $?"
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/old.json')); n=json.load(open('/tmp/new.json'))
+          print('LOG', json.dumps(n['refreshLog'], indent=1))
+          print('baseFactor', n.get('baseFactor'), 'foodBaseFactor', n.get('foodBaseFactor'))
+          for cc in 'US TR IT FR ES DE GB GR PT NL AT CZ HU PL HR CH GE AE QA EG MA TH ID SG JP KR MX AU RU AZ'.split():
+              print(cc, o['food'].get(cc), '->', n['food'].get(cc))
+          PY
+          cp /tmp/new.json new-prices.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: new-prices
+          path: new-prices.json
