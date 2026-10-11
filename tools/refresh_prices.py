@@ -54,13 +54,17 @@ def log(msg):
     print(msg, flush=True)
 
 
+FX_ERRORS = []
+
+
 def latest_fx():
     for url in FX_URLS:
         try:
             data = json.loads(get(url))
             return data['date'], {k.upper(): v for k, v in data['usd'].items()}
         except Exception as e:
-            log(f'  fx source failed ({url}): {e}')
+            log(f'  fx source failed ({url}): {e!r}')
+            FX_ERRORS.append(f'{url.split("/")[2]}: {e!r}'[:160])
     return None, None
 
 
@@ -112,7 +116,7 @@ def main():
         out['fxDate'] = fx_date
         notes.append(f'fx {fx_date}')
     else:
-        notes.append('fx kept')
+        notes.append('fx kept (' + ' | '.join(FX_ERRORS) + ')')
 
     # 2) Price levels brought forward to today
     try:
@@ -149,7 +153,7 @@ def main():
         out['levelBasis'] = f'World Bank PPP {max(ppp_years)} + CPI, FX {fx_date}'
         notes.append(f'levels {len(levels)} countries ({out["levelBasis"]})')
     except Exception as e:
-        notes.append(f'levels kept ({e})')
+        notes.append(f'levels kept ({e!r})'[:300])
 
     # 3) US inflation since the base costs were set
     try:
@@ -162,9 +166,10 @@ def main():
         notes.append(f'baseFactor {out["baseFactor"]} (US CPI {BASE_CPI_MONTH} → {latest})')
     except Exception as e:
         out.setdefault('baseFactor', 1)
-        notes.append(f'baseFactor kept ({e})')
+        notes.append(f'baseFactor kept ({e!r})'[:300])
 
     out['generated'] = today
+    out['refreshLog'] = notes   # what the last monthly run did (kept for transparency)
     with open(OUT, 'w') as f:
         json.dump(out, f, separators=(',', ':'))
     log('prices.json: ' + '; '.join(notes))
