@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /tools/
+Disallow: /data/
+Disallow: /api/
+
+Sitemap: https://waybudget.com/sitemap.xml
