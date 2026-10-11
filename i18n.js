@@ -57,6 +57,7 @@ const TR = {
     'Round trip {a} ⇄ {b}': 'Gidiş-dönüş {a} ⇄ {b}',
     'Direct': 'Direkt', '{n} stop': '{n} aktarma', '{n} stops': '{n} aktarma',
     '{out} out, {back} back': 'gidiş {out}, dönüş {back}',
+    'See flights': 'Uçuşları gör',
     'Typical fare': 'Tipik fiyat', 'Business class': 'Business sınıfı',
     'closest fare seen: {dates}': 'en yakın görülen fiyat: {dates}',
     'few fares seen for these dates': 'bu tarihler için az uçuş görüldü',

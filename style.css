@@ -373,6 +373,21 @@ input.invalid {
 .item-body { min-width: 0; }
 .item-title { font-weight: 700; font-size: 15px; }
 .item-detail { font-size: 13px; color: var(--muted); }
+.item-link,
+.item-link:focus,
+.item-link:active {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--brand);
+    text-decoration: none;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+.item-link:hover { text-decoration: underline; }
 .item-choices {
     grid-column: 2 / -1;
     justify-self: start;

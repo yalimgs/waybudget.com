@@ -185,7 +185,7 @@ function calculateBudget(trip, choices, live = {}) {
         items.push({
             key: 'flights', label: 'Flights',
             detail: `${route} · ${info} · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind, source
+            amount: perPerson * travelers, kind, source, link: aviasalesLink(trip)
         });
     } else {
         const perPerson = estimateFlightPerPerson(km, choices.flights);
@@ -193,7 +193,8 @@ function calculateBudget(trip, choices, live = {}) {
             key: 'flights', label: 'Flights',
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
             amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
-            source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)')
+            source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
+            link: aviasalesLink(trip)
         });
     }
 
@@ -311,6 +312,19 @@ function stopsText(n) {
 }
 
 /* "10–12 Nov" or "28 Nov – 2 Dec" in the current language */
+/*
+ * Aviasales search for the user's own route, dates and travelers, tagged with
+ * our Travelpayouts marker so bookings are credited to WayBudget.
+ * Format: /search/IST1011FCO15112 = IST on 10 Nov, FCO back on 15 Nov, 2 adults.
+ */
+const TP_MARKER = '787962';
+function aviasalesLink(trip) {
+    const ddmm = iso => iso.slice(8, 10) + iso.slice(5, 7);
+    const pax = Math.min(Math.max(trip.travelers, 1), 9);
+    const path = `${trip.origin.a[0]}${ddmm(trip.start)}${trip.destination.a[0]}${ddmm(trip.end)}${pax}`;
+    return `https://www.aviasales.com/search/${path}?marker=${TP_MARKER}`;
+}
+
 function shortRange(depIso, retIso) {
     const d = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
     const a = d(depIso), b = d(retIso), loc = dateLocale();

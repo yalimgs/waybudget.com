@@ -295,6 +295,15 @@ async function renderBudget() {
         detail.className = 'item-detail';
         detail.textContent = item.detail;
         body.append(title, detail);
+        if (item.link && item.kind !== 'none') {
+            const link = document.createElement('a');
+            link.className = 'item-link';
+            link.href = item.link;
+            link.target = '_blank';
+            link.rel = 'sponsored noopener';
+            link.textContent = t('See flights') + ' →';
+            body.appendChild(link);
+        }
 
         // Per-item choice (e.g. cheapest flight + 4–5★ hotel)
         const options = BUDGET_MODEL.options[item.key];
