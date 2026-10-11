@@ -378,3 +378,20 @@ function invalidateBudget() {
     liveData = {};
     document.getElementById('budgetResult').hidden = true;
 }
+
+/*
+ * Every link to another site opens in a new tab, so the budget stays open.
+ * Runs before other click handlers (capture phase), using the link's current
+ * href, which already includes affiliate tracking added on page load.
+ */
+document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    let url;
+    try { url = new URL(a.href, location.href); } catch (err) { return; }
+    if (url.origin === location.origin || !/^https?:$/.test(url.protocol)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.open(url.href, '_blank', 'noopener');
+}, true);
+
