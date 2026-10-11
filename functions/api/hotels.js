@@ -15,7 +15,7 @@ const API = 'https://api.liteapi.travel/v3.0/hotels/rates';
 const TTL = 3600;
 
 // Our LiteAPI whitelabel booking site (bookings there earn our commission)
-const WHITELABEL = 'https://yal-m--z-a-layan-eycnx.nuitee.link';
+const WHITELABEL = 'https://waybudget.nuitee.link';
 
 /* Rooms for a group: 2 adults per room, e.g. 5 travelers -> [2, 2, 1] */
 function rooms(travelers) {
