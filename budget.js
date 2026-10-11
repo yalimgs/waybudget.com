@@ -168,7 +168,7 @@ function calculateBudget(trip, choices, live = {}) {
             }
         } else if (fl.business) {
             perPerson = fl.business.price;
-            info = 'Business class';
+            info = 'Business class' + (fl.business.transfers != null ? ` · ${stopsText(fl.business.transfers)}` : '');
             source = 'Lowest business-class fare seen recently (Aviasales)';
         } else {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
@@ -297,11 +297,22 @@ const AIRLINES = {
     HV: 'Transavia', TO: 'Transavia France', DY: 'Norwegian', BT: 'airBaltic', '6E': 'IndiGo', AI: 'Air India'
 };
 
+function stopsText(n) {
+    return n === 0 ? 'Direct' : `${n} stop${n > 1 ? 's' : ''}`;
+}
+
+/* "Pegasus · Direct", or "Pegasus · 1 stop out, direct back" when the legs differ */
 function describeFare(f) {
     const airline = AIRLINES[f.airline] || f.airline || '';
-    const stops = Math.max(f.transfers || 0, f.returnTransfers || 0);
-    const stopText = stops === 0 ? 'Direct' : `${stops} stop${stops > 1 ? 's' : ''}`;
-    return [airline, stopText].filter(Boolean).join(' · ');
+    const out = f.transfers, back = f.returnTransfers;
+    let stops = '';
+    if (out != null && back != null) {
+        stops = out === back ? stopsText(out)
+            : `${stopsText(out)} out, ${stopsText(back).toLowerCase()} back`;
+    } else if (out != null) {
+        stops = stopsText(out);
+    }
+    return [airline, stops].filter(Boolean).join(' · ');
 }
 
 /*
