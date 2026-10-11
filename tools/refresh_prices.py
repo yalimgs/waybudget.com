@@ -98,8 +98,13 @@ def wb_series(indicator, years=12):
 def us_cpi():
     raw = json.loads(get(BLS))
     rows = raw['Results']['series'][0]['data']
-    vals = {f"{r['year']}-{r['period'][1:]}": float(r['value']) for r in rows if r['period'].startswith('M')
-            and r['period'] != 'M13'}
+    vals = {}
+    for r in rows:
+        try:
+            if r['period'].startswith('M') and r['period'] != 'M13':
+                vals[f"{r['year']}-{r['period'][1:]}"] = float(r['value'])
+        except ValueError:
+            pass   # months without data are published as '-'
     return vals
 
 
@@ -159,11 +164,13 @@ def main():
     try:
         vals = us_cpi()
         latest = max(vals)
-        if BASE_CPI_MONTH not in vals:
-            raise ValueError(f'base month {BASE_CPI_MONTH} not in BLS response')
-        out['baseFactor'] = round(vals[latest] / vals[BASE_CPI_MONTH], 4)
-        out['baseCpi'] = {'base': BASE_CPI_MONTH, 'latest': latest}
-        notes.append(f'baseFactor {out["baseFactor"]} (US CPI {BASE_CPI_MONTH} → {latest})')
+        # base month itself, or the last published month before it
+        base = max((m for m in vals if m <= BASE_CPI_MONTH), default=None)
+        if not base:
+            raise ValueError(f'no CPI at or before {BASE_CPI_MONTH}')
+        out['baseFactor'] = round(vals[latest] / vals[base], 4)
+        out['baseCpi'] = {'base': base, 'latest': latest}
+        notes.append(f'baseFactor {out["baseFactor"]} (US CPI {base} → {latest})')
     except Exception as e:
         out.setdefault('baseFactor', 1)
         notes.append(f'baseFactor kept ({e!r})'[:300])
