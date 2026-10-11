@@ -41,7 +41,11 @@ const BUDGET_MODEL = {
     // Food: per person per day (US base): breakfast, lunch, dinner, drinks/snacks
     foodDay:      { budget: 35, standard: 70, luxury: 130 },
     foodExp: 0.75,
-    bigCityFoodFactor: 1.1,
+    // How strongly each tier follows the local price level: street food tracks
+    // local prices closely, fine dining is closer to international prices
+    // (checked against Istanbul, Rome, Zurich, Bangkok and India, Oct 2026)
+    foodTierExp: { budget: 1.25, standard: 1.1, luxury: 0.8 },
+    bigCityFoodFactor: 1.15,
 
     // Getting around the city during the stay: per person per day (US base)
     localDay:     { public: 6, mixed: 12, taxi: 30 },
@@ -225,7 +229,8 @@ function calculateBudget(trip, choices, live = {}) {
     const foodLevel = (priceData && priceData.food && priceData.food[destination.cc]) || level ** M.foodExp;
     // US restaurant inflation (food away from home) when available, else overall US CPI
     const infFood = (priceData && priceData.foodBaseFactor) || inf;
-    const foodDay = infFood * M.foodDay[choices.food] * foodLevel * (big ? M.bigCityFoodFactor : 1);
+    const foodDay = infFood * M.foodDay[choices.food] * foodLevel ** (M.foodTierExp[choices.food] || 1) *
+                    (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
         detail: t('{t} × {d} days · ~{p} per person/day', { t: travelers, d: days, p: money(foodDay) }),
