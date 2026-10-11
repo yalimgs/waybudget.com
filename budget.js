@@ -213,7 +213,9 @@ function calculateBudget(trip, choices, live = {}) {
     }
 
     // ---- Food
-    const foodDay = inf * M.foodDay[choices.food] * level ** M.foodExp * (big ? M.bigCityFoodFactor : 1);
+    // Restaurant price level (World Bank ICP) when known, else the softened overall level
+    const foodLevel = (priceData && priceData.food && priceData.food[destination.cc]) || level ** M.foodExp;
+    const foodDay = inf * M.foodDay[choices.food] * foodLevel * (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
         detail: `${travelers} × ${days} days · ~${money(foodDay)} per person/day`,
@@ -222,7 +224,9 @@ function calculateBudget(trip, choices, live = {}) {
     });
 
     // ---- Airport transfers (both ways)
-    const roadKm = Math.max(8, destination.d || 20) * M.roadFactor;
+    // Real road distance when known (OpenStreetMap routing), else straight line × 1.3
+    const roadKm = destination.rk || Math.max(8, destination.d || 20) * M.roadFactor;
+    const driveMin = destination.rm || null;
     const taxiRide = inf * (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
     let transfer;
     if (choices.transfer === 'transit') {
@@ -232,11 +236,14 @@ function calculateBudget(trip, choices, live = {}) {
     } else {
         const ride = taxiRide * (choices.transfer === 'private' ? M.privateFactor : 1);
         transfer = { amount: ride * cars * 2,
-            detail: `Both ways · ${plural(cars, 'car')} · ~${Math.round(roadKm)} km · ~${money(ride)} per ride` };
+            detail: `Both ways · ${plural(cars, 'car')} · ~${Math.round(roadKm)} km` +
+                    (driveMin ? ` (~${driveMin} min)` : '') + ` · ~${money(ride)} per ride` };
     }
     items.push({
         key: 'transfer', label: 'Airport transfers', ...transfer, kind: 'estimate',
-        source: `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre`
+        source: destination.rk
+            ? `${destination.a[0]} → city centre: ${Math.round(destination.rk)} km by road (OpenStreetMap)`
+            : `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre (straight line)`
     });
 
     // ---- Getting around the city during the stay

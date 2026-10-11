@@ -8,6 +8,8 @@ What it updates
              PPP_Y   World Bank GDP PPP conversion factor, latest year (PA.NUS.PPP)
              CPI     World Bank consumer price index, latest year (FP.CPI.TOTL)
              FX      today's market rate (local currency per USD)
+  food       Restaurant price level per country (USA = 1.0): overall level ×
+             restaurants-vs-economy ratio from the World Bank ICP benchmark
   fx         Fallback display rates (USD, EUR, GBP, TRY) used if /api/fx is down
   baseFactor US inflation since the base costs in budget.js were set
              (US CPI-U from the BLS, monthly). All US base costs are × this.
@@ -42,6 +44,10 @@ FX_URLS = ['https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/cur
 C2C_URL = 'https://cdn.jsdelivr.net/npm/country-to-currency@3/index.js'
 WB = 'https://api.worldbank.org/v2/country/all/indicator/{ind}?format=json&per_page=20000&date={a}:{b}'
 BLS = 'https://api.bls.gov/publicAPI/v1/timeseries/data/CUUR0000SA0'
+WB_SOURCES = 'https://api.worldbank.org/v2/sources?format=json&per_page=200'
+WB_COUNTRIES = 'https://api.worldbank.org/v2/country?format=json&per_page=400'
+ICP = ('https://api.worldbank.org/v2/sources/{src}/country/all/series/1111000;1000000'
+       '/classification/PX.WL/time/YR{year}?format=json&per_page=2000')
 
 
 def get(url, timeout=60):
@@ -93,6 +99,35 @@ def wb_series(indicator, years=12):
         if row.get('value') is not None and cc and len(cc) == 2:
             out.setdefault(cc, {})[int(row['date'])] = float(row['value'])
     return out
+
+
+def restaurant_ratios():
+    """
+    {ISO2: restaurant price level ÷ overall price level}, both relative to the
+    USA, from the latest World Bank ICP benchmark (ICP 2021 today; a newer
+    cycle is picked up automatically when the World Bank publishes it).
+    """
+    sources = json.loads(get(WB_SOURCES))[1]
+    icp = []
+    for src in sources:
+        name = src.get('name', '')
+        digits = ''.join(ch for ch in name if ch.isdigit())
+        if name.upper().startswith('ICP') and len(digits) == 4:
+            icp.append((int(digits), src['id']))
+    year, src = max(icp)
+    iso = {c['id']: c['iso2Code'] for c in json.loads(get(WB_COUNTRIES))[1]}
+    data = json.loads(get(ICP.format(src=src, year=year)))['source']['data']
+    pli = {}
+    for obs in data:
+        v = {x['concept']: x['id'] for x in obs['variable']}
+        if obs.get('value') is not None and v.get('Country') in iso:
+            pli.setdefault(iso[v['Country']], {})[v['Series']] = float(obs['value'])
+    us = pli['US']
+    out = {}
+    for cc, s in pli.items():
+        if '1111000' in s and '1000000' in s:
+            out[cc] = (s['1111000'] / us['1111000']) / (s['1000000'] / us['1000000'])
+    return year, out
 
 
 def us_cpi():
@@ -159,6 +194,25 @@ def main():
         notes.append(f'levels {len(levels)} countries ({out["levelBasis"]})')
     except Exception as e:
         notes.append(f'levels kept ({e!r})'[:300])
+
+    # 2b) Restaurant price level per country = today's overall level × how much
+    #     pricier/cheaper restaurants are than the overall economy there (ICP)
+    try:
+        if 'level' not in out:
+            raise ValueError('no overall levels')
+        icp_year, ratios = restaurant_ratios()
+        if len(ratios) < 100:
+            raise ValueError(f'only {len(ratios)} countries')
+        food = {}
+        for cc, lvl in out['level'].items():
+            r = ratios.get(cc) or ratios.get(PARENT.get(cc, ''))
+            if r:
+                food[cc] = round(min(2.0, max(0.15, lvl * r)), 3)
+        out['food'] = dict(sorted(food.items()))
+        out['foodBasis'] = f'World Bank ICP {icp_year} restaurants & hotels'
+        notes.append(f'food levels {len(food)} countries (ICP {icp_year})')
+    except Exception as e:
+        notes.append(f'food levels kept ({e!r})'[:300])
 
     # 3) US inflation since the base costs were set
     try:

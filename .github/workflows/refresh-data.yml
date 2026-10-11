@@ -19,7 +19,7 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Should this run?
         id: when
@@ -54,6 +54,9 @@ jobs:
           (cd "$work" && npm init -y >/dev/null && npm install --silent all-the-cities@3 pbf@3)
           node tools/dump_geonames.js "$work/node_modules/all-the-cities" "$work/geonames.json"
           cp data/cities.json "$work/cities.prev.json"
+          python3 tools/build_cities.py "$work/ourairports" "$work/geonames.json" data/cities.json
+          # road distances for airports not cached yet, then merge them in
+          python3 tools/road_distances.py "$work/ourairports" data/cities.json data/roads.json 1200 || true
           python3 tools/build_cities.py "$work/ourairports" "$work/geonames.json" data/cities.json
           count=$(python3 -c "import json;print(len(json.load(open('data/cities.json'))))")
           echo "cities: $count"

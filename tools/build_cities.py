@@ -12,7 +12,7 @@ Sources (both free/open):
 Usage:
   python3 tools/build_cities.py <ourairports_dir> <geonames_cities.json> data/cities.json
 """
-import csv, json, math, re, sys, unicodedata
+import csv, json, math, os, re, sys, unicodedata
 from collections import defaultdict
 
 ap_dir, cities_path, out_path = sys.argv[1:4]
@@ -181,6 +181,14 @@ for g in groups.values():
         "k": " ".join(sorted(g["k"])),                  # extra search keywords
         "l": 1 if any(x[0] == 0 for x in g["ap"]) else 0,  # has a large airport
     })
+
+# Real road distance/time from the main airport (tools/road_distances.py cache)
+roads_path = os.path.join(os.path.dirname(out_path), "roads.json")
+roads = json.load(open(roads_path)) if os.path.exists(roads_path) else {}
+for c in out:
+    r = roads.get(c["a"][0])
+    if r:
+        c["rk"], c["rm"] = r            # road km, minutes
 
 out.sort(key=lambda x: (-x["l"], x["n"]))
 with open(out_path, "w", encoding="utf-8") as f:
