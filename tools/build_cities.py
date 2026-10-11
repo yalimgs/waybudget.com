@@ -178,6 +178,8 @@ for g in groups.values():
         # km from main airport to city centre (for transfer estimates)
         # (straight line; bogus values from unmatched cities fall back to 20 km)
         "d": (lambda km: km if km <= 90 else 20)(round(dist_km(g["lat"], g["lon"], *g["apll"][g["ap"][0][2]]))),
+        # main airport position (for airport → hotel distances)
+        "al": [round(v, 3) for v in g["apll"][g["ap"][0][2]]],
         "k": " ".join(sorted(g["k"])),                  # extra search keywords
         "l": 1 if any(x[0] == 0 for x in g["ap"]) else 0,  # has a large airport
     })

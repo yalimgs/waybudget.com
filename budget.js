@@ -224,26 +224,44 @@ function calculateBudget(trip, choices, live = {}) {
     });
 
     // ---- Airport transfers (both ways)
-    // Real road distance when known (OpenStreetMap routing), else straight line × 1.3
-    const roadKm = destination.rk || Math.max(8, destination.d || 20) * M.roadFactor;
-    const driveMin = destination.rm || null;
+    // Distance: to the chosen hotel when its location is known, else to the city
+    // centre. Road km = straight line × this city's road/straight ratio (from the
+    // real airport → centre route), drive time from the same route's speed.
+    const cityRoadRatio = destination.rk && destination.d >= 3
+        ? Math.min(2, Math.max(1.1, destination.rk / destination.d)) : M.roadFactor;
+    const hotelPick = choices.hotel !== 'none' && ho && ho.example && ho.example.lat && destination.al
+        ? ho.example : null;
+    let roadKm, transferTo;
+    if (hotelPick) {
+        const straight = distanceKm({ lat: destination.al[0], lon: destination.al[1] },
+                                    { lat: hotelPick.lat, lon: hotelPick.lon });
+        roadKm = Math.max(3, straight) * cityRoadRatio;
+        transferTo = hotelPick.name;
+    } else {
+        roadKm = destination.rk || Math.max(8, destination.d || 20) * M.roadFactor;
+        transferTo = 'city centre';
+    }
+    const minPerKm = destination.rk && destination.rm ? destination.rm / destination.rk : null;
+    const driveMin = minPerKm ? Math.round(roadKm * minPerKm) : null;
     const taxiRide = inf * (M.taxiFlag + M.taxiPerKm * roadKm) * level ** M.transitExp;
     let transfer;
     if (choices.transfer === 'transit') {
         const ride = inf * M.transitTrip * level ** M.transitExp;
         transfer = { amount: ride * travelers * 2,
-            detail: `Both ways · ${travelers} × ~${money(ride)} per ride` };
+            detail: `${destination.a[0]} → ${transferTo} · both ways · ${travelers} × ~${money(ride)} per ride` };
     } else {
         const ride = taxiRide * (choices.transfer === 'private' ? M.privateFactor : 1);
         transfer = { amount: ride * cars * 2,
-            detail: `Both ways · ${plural(cars, 'car')} · ~${Math.round(roadKm)} km` +
-                    (driveMin ? ` (~${driveMin} min)` : '') + ` · ~${money(ride)} per ride` };
+            detail: `${destination.a[0]} → ${transferTo} · ~${Math.round(roadKm)} km` +
+                    (driveMin ? ` (~${driveMin} min)` : '') + ` · both ways · ${plural(cars, 'car')} · ~${money(ride)} per ride` };
     }
     items.push({
         key: 'transfer', label: 'Airport transfers', ...transfer, kind: 'estimate',
-        source: destination.rk
-            ? `${destination.a[0]} → city centre: ${Math.round(destination.rk)} km by road (OpenStreetMap)`
-            : `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre (straight line)`
+        source: hotelPick
+            ? `Distance to the example hotel, estimated from this city's road network; taxi fares estimated`
+            : destination.rk
+                ? `${destination.a[0]} → city centre: ${Math.round(destination.rk)} km by road (OpenStreetMap)`
+                : `${destination.a[0]} is ~${Math.round(destination.d || 20)} km from the city centre (straight line)`
     });
 
     // ---- Getting around the city during the stay
@@ -301,7 +319,7 @@ function fetchFlights(trip) {
 
 function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
-                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=4`);
+                   `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&v=5`);
 }
 
 /* ------------------------------------------------------------- Currency -- */

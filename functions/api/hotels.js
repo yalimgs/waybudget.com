@@ -89,6 +89,8 @@ export async function onRequestGet(context) {
                     stars: Number(h.stars ?? h.starRating) || null,
                     rating: Number(h.rating) || null,
                     reviews: Number(h.review_count) || 0,
+                    lat: Number(h.latitude) || null,
+                    lon: Number(h.longitude) || null,
                     perNight: Math.round((total / nights) * 100) / 100
                 });
             }
@@ -131,7 +133,8 @@ export async function onRequestGet(context) {
                 : byPrice(list)[list.length - 1];
 
             const tier = h => ({ perNight: h.perNight,
-                                 example: h.name ? { name: h.name, stars: h.stars, rating: h.rating } : null });
+                                 example: h.name ? { name: h.name, stars: h.stars, rating: h.rating,
+                                                     lat: h.lat, lon: h.lon } : null });
             return {
                 found: true, currency: 'USD', nights, count: list.length,
                 budget: tier(budgetHotel), standard: tier(standardHotel), luxury: tier(luxuryHotel),
