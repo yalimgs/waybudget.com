@@ -3,6 +3,8 @@ name: Test food levels
 on:
   push:
     branches: [food-indexes]
+permissions:
+  contents: write
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,8 +23,11 @@ jobs:
           for cc in 'US TR IT FR ES DE GB GR PT NL AT CZ HU PL HR CH GE AE QA EG MA TH ID SG JP KR MX AU RU AZ'.split():
               print(cc, o['food'].get(cc), '->', n['food'].get(cc))
           PY
-          cp /tmp/new.json new-prices.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: new-prices
-          path: new-prices.json
+          cp /tmp/new.json test-new-prices.json
+      - name: Save result on this test branch
+        run: |
+          python3 tools/refresh_prices.py /tmp/new2.json > test-output.txt 2>&1 || true
+          git config user.name "waybudget-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test-new-prices.json test-output.txt
+          git commit -m "test output [skip ci]" && git push || true
