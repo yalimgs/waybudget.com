@@ -6,6 +6,7 @@
 //   economy:  cheapest fare seen (any number of stops)
 //   standard: typical fare = median of fares seen, direct preferred
 //   business: cheapest business-class fare seen (null if none)
+//   book:     where to send the user to book ({ url with {adults}, maxAdults })
 // Exact dates are tried first; if nothing was seen for those dates, the
 // cheapest fares seen for the same months are returned (match: "month").
 // Responses are cached at the edge for 6 hours.
@@ -13,6 +14,24 @@
 import { cached, json, isIata, isDate } from '../_lib/cache.js';
 
 const API = 'https://api.travelpayouts.com/aviasales/v3/prices_for_dates';
+
+// Travelpayouts partner marker: bookings via our links are credited to WayBudget
+const TP_MARKER = '787962';
+
+/*
+ * Where "See flights" sends the user: Aviasales search for the same route and
+ * dates, tagged with our marker. {adults} is filled in by the page (1–9), so
+ * this cached response stays the same for every group size.
+ * Format: /search/IST1011FCO15112 = IST on 10 Nov, FCO back on 15 Nov, 2 adults.
+ */
+function bookingLink(origin, destination, depart, ret) {
+    const ddmm = iso => iso.slice(8, 10) + iso.slice(5, 7);
+    return {
+        url: `https://www.aviasales.com/search/${origin}${ddmm(depart)}${destination}${ddmm(ret)}{adults}?marker=${TP_MARKER}`,
+        maxAdults: 9,
+        provider: 'Aviasales'
+    };
+}
 const TTL = 6 * 3600;
 
 async function query(env, p) {
@@ -153,14 +172,15 @@ export async function onRequestGet(context) {
                 list = await query(env, { origin, destination,
                     departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
             }
+            const book = bookingLink(origin, destination, depart, ret);
             const result = summarize(list, depart, ret);
-            if (!result) return { found: false };
+            if (!result) return { found: false, book };
             // Sanity check: a business fare far outside 1.3–6× the typical
             // economy fare is more likely a data glitch than a real price
             let biz = await businessFare;
             const ref = result.standard.price;
             if (biz && (biz.price < ref * 1.3 || biz.price > ref * 6)) biz = null;
-            return { found: true, match, currency: 'USD', ...result, business: biz,
+            return { found: true, match, currency: 'USD', ...result, business: biz, book,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {
             return { error: e.message };

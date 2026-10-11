@@ -185,7 +185,7 @@ function calculateBudget(trip, choices, live = {}) {
         items.push({
             key: 'flights', label: 'Flights',
             detail: `${route} · ${info} · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind, source, link: aviasalesLink(trip)
+            amount: perPerson * travelers, kind, source, link: bookingLink(fl.book, travelers)
         });
     } else {
         const perPerson = estimateFlightPerPerson(km, choices.flights);
@@ -194,7 +194,7 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km · ${travelers} × ${money(perPerson)}`,
             amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
             source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
-            link: aviasalesLink(trip)
+            link: bookingLink(live.flights && live.flights.book, travelers)
         });
     }
 
@@ -313,16 +313,13 @@ function stopsText(n) {
 
 /* "10–12 Nov" or "28 Nov – 2 Dec" in the current language */
 /*
- * Aviasales search for the user's own route, dates and travelers, tagged with
- * our Travelpayouts marker so bookings are credited to WayBudget.
- * Format: /search/IST1011FCO15112 = IST on 10 Nov, FCO back on 15 Nov, 2 adults.
+ * "See flights" link from the flight API (provider-neutral: the API decides
+ * where to book). Null until the API has answered.
  */
-const TP_MARKER = '787962';
-function aviasalesLink(trip) {
-    const ddmm = iso => iso.slice(8, 10) + iso.slice(5, 7);
-    const pax = Math.min(Math.max(trip.travelers, 1), 9);
-    const path = `${trip.origin.a[0]}${ddmm(trip.start)}${trip.destination.a[0]}${ddmm(trip.end)}${pax}`;
-    return `https://www.aviasales.com/search/${path}?marker=${TP_MARKER}`;
+function bookingLink(book, travelers) {
+    if (!book || !book.url) return null;
+    const adults = Math.min(Math.max(travelers, 1), book.maxAdults || 9);
+    return book.url.replace('{adults}', adults);
 }
 
 function shortRange(depIso, retIso) {
@@ -358,7 +355,7 @@ function getJson(url) {
 
 function fetchFlights(trip) {
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
-                   `&depart=${trip.start}&return=${trip.end}&v=6`);
+                   `&depart=${trip.start}&return=${trip.end}&v=7`);
 }
 
 function fetchHotels(trip) {
