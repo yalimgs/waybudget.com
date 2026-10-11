@@ -223,7 +223,9 @@ function calculateBudget(trip, choices, live = {}) {
     // ---- Food
     // Restaurant price level (World Bank ICP) when known, else the softened overall level
     const foodLevel = (priceData && priceData.food && priceData.food[destination.cc]) || level ** M.foodExp;
-    const foodDay = inf * M.foodDay[choices.food] * foodLevel * (big ? M.bigCityFoodFactor : 1);
+    // US restaurant inflation (food away from home) when available, else overall US CPI
+    const infFood = (priceData && priceData.foodBaseFactor) || inf;
+    const foodDay = infFood * M.foodDay[choices.food] * foodLevel * (big ? M.bigCityFoodFactor : 1);
     items.push({
         key: 'food', label: 'Food & drinks',
         detail: t('{t} × {d} days · ~{p} per person/day', { t: travelers, d: days, p: money(foodDay) }),
