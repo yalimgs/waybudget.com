@@ -28,7 +28,18 @@ document.addEventListener('DOMContentLoaded', () => {
     els.startDate.min = toISODate(new Date());
     updateMinEndDate();
 
-    els.startDate.addEventListener('change', () => { updateMinEndDate(); updateRouteSummary(); });
+    els.startDate.addEventListener('change', () => {
+        updateMinEndDate();
+        updateRouteSummary();
+        // Departure picked -> go straight on to the return date (one way only:
+        // picking a return date never reopens departure)
+        if (els.startDate.value && !els.endDate.value) {
+            setTimeout(() => {
+                els.endDate.focus();
+                try { els.endDate.showPicker(); } catch (e) { /* browser may need a click; field is focused */ }
+            }, 150);
+        }
+    });
     els.endDate.addEventListener('change', updateRouteSummary);
     els.swapBtn.addEventListener('click', swapCities);
     els.tripForm.addEventListener('submit', submitTrip);
