@@ -155,6 +155,14 @@ function updateDateDisplays() {
         span.textContent = value ? formatDate(value) : t('Select date');
         span.classList.toggle('empty', !value);
     });
+    // Nights summary under the date fields
+    const note = document.getElementById('nightsNote');
+    const start = els.startDate.value, end = els.endDate.value;
+    if (note) {
+        const n = start && end ? nightsBetween(start, end) : 0;
+        note.hidden = n < 1;
+        note.textContent = n >= 1 ? tn(n, '{n} night', '{n} nights') : '';
+    }
 }
 
 /* One-line trip summary shown under the budget title */

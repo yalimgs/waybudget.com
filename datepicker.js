@@ -148,7 +148,7 @@ const DatePicker = (() => {
             render();
             announce(rangeText());
             commit();
-            setTimeout(() => close(false), 220);   // already committed; short pause shows the range
+            close(false);                          // nights are shown under the date fields
         }
     }
 

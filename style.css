@@ -123,6 +123,13 @@ body {
     gap: 12px;
     margin-top: 16px;
 }
+.detail-row .travelers-field { grid-column: 3; grid-row: 1; }
+/* "5 nights" under the two date fields once both are picked */
+.nights-note {
+    grid-column: 1 / 3; grid-row: 2;
+    margin: -6px 0 0 2px;
+    font-size: 13px; font-weight: 700; color: var(--brand);
+}
 .field {
     display: flex;
     flex-direction: column;
@@ -524,6 +531,8 @@ input.invalid {
     .swap-btn { justify-self: center; margin: 0; transform: rotate(90deg); }
     .swap-btn:hover { transform: rotate(270deg); }
     .detail-row { grid-template-columns: 1fr 1fr; }
+    .detail-row .travelers-field { grid-column: 1 / -1; grid-row: 3; }
+    .nights-note { grid-column: 1 / -1; grid-row: 2; }
     .travelers-field { grid-column: 1 / -1; }
     .date-display { left: 12px; right: 8px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
     .date-input input::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; inset: 0; width: auto; height: auto; }
