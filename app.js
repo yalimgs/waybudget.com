@@ -307,6 +307,26 @@ function loadLivePrices() {
         });
     }
 }
+/* Last budget choices and currency are remembered in this browser */
+function loadPrefs() {
+    const out = { choices: { ...BUDGET_MODEL.presets.standard }, currency: 'USD' };
+    try {
+        const saved = JSON.parse(localStorage.getItem('wb-choices') || 'null');
+        if (saved) for (const k of Object.keys(out.choices)) {
+            const ok = (BUDGET_MODEL.options[k] || []).some(([v]) => v === saved[k]);
+            if (ok) out.choices[k] = saved[k];
+        }
+        const cur = localStorage.getItem('wb-currency');
+        if (cur && document.querySelector(`#currency option[value="${cur}"]`)) out.currency = cur;
+    } catch (e) { /* storage blocked or bad data: defaults */ }
+    return out;
+}
+function savePrefs() {
+    try {
+        localStorage.setItem('wb-choices', JSON.stringify(choices));
+        localStorage.setItem('wb-currency', displayCurrency);
+    } catch (e) { /* storage blocked */ }
+}
 let choices = { ...BUDGET_MODEL.presets.standard };
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
@@ -368,6 +388,7 @@ async function renderBudget() {
                 btn.addEventListener('click', () => {
                     if (choices[item.key] === value) return;
                     choices[item.key] = value;
+                    savePrefs();
                     syncPresetTabs();
                     loadLivePrices();
                     renderBudget();
@@ -395,9 +416,15 @@ async function renderBudget() {
 }
 
 function setupBudgetControls() {
+    const prefs = loadPrefs();
+    choices = prefs.choices;
+    displayCurrency = prefs.currency;
+    document.getElementById('currency').value = displayCurrency;
+    syncPresetTabs();
     document.querySelectorAll('.tier-tabs button').forEach(btn => {
         btn.addEventListener('click', () => {
             choices = { ...BUDGET_MODEL.presets[btn.dataset.tier] };
+            savePrefs();
             syncPresetTabs();
             loadLivePrices();
             renderBudget();
@@ -406,6 +433,7 @@ function setupBudgetControls() {
     document.addEventListener('fx:update', renderBudget);
     document.getElementById('currency').addEventListener('change', e => {
         displayCurrency = e.target.value;
+        savePrefs();
         renderBudget();
     });
 }
