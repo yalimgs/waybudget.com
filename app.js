@@ -28,27 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
     els.startDate.min = toISODate(new Date());
     updateMinEndDate();
 
-    els.startDate.addEventListener('change', () => {
-        updateMinEndDate();
-        updateRouteSummary();
-        // Departure picked -> go straight on to the return date (one way only:
-        // picking a return date never reopens departure)
-        if (els.startDate.value && !els.endDate.value) {
-            setTimeout(() => {
-                els.endDate.focus();
-                try { els.endDate.showPicker(); } catch (e) { /* browser may need a click; field is focused */ }
-            }, 150);
-        }
-    });
+    els.startDate.addEventListener('change', () => { updateMinEndDate(); updateRouteSummary(); });
     els.endDate.addEventListener('change', updateRouteSummary);
     els.swapBtn.addEventListener('click', swapCities);
     els.tripForm.addEventListener('submit', submitTrip);
     document.addEventListener('trip:change', updateRouteSummary);
 
-    // Clicking anywhere on a date field opens the calendar
-    [els.startDate, els.endDate].forEach(input => input.addEventListener('click', () => {
-        try { input.showPicker(); } catch (e) { /* older browsers open it themselves */ }
-    }));
+    // Our own range calendar (departure, then return) on every device
+    DatePicker.setup(els.startDate, els.endDate);
     updateDateDisplays();
 
     setupTravelersInput();
