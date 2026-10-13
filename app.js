@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('langBtn').addEventListener('click', () => setLanguage(LANG === 'tr' ? 'en' : 'tr'));
     document.addEventListener('lang:change', () => {
         updateDateDisplays();
-        if (!els.formError.hidden && els.formError.dataset.key) els.formError.textContent = t(els.formError.dataset.key);
+        if (!els.formError.hidden && els.formError.dataset.key) refreshErrors();
         renderBudget();
     });
 
@@ -146,6 +146,7 @@ function swapCities() {
 function updateRouteSummary() {
     invalidateBudget();
     updateDateDisplays();
+    refreshErrors();
 }
 
 /* Shows the chosen dates as "3 April 2026" (the native field follows the browser locale) */
@@ -172,58 +173,101 @@ function tripLineText(trip) {
 
 /* ----------------------------------------------------------- Submission -- */
 
-function showError(message, fieldIds = []) {
+const MAX_NIGHTS = 60;   // hotel rates are not available for longer stays
+
+function showError(message, fieldIds = [], vars = {}, focus = true) {
     els.formError.dataset.key = message;          // English key, re-translated on language change
-    els.formError.textContent = t(message);
+    els.formError.dataset.vars = JSON.stringify(vars);
+    els.formError.textContent = t(message, vars);
     els.formError.hidden = false;
+    document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
     fieldIds.forEach(id => document.getElementById(id).classList.add('invalid'));
-    if (fieldIds[0]) document.getElementById(fieldIds[0]).focus();
+    if (focus && fieldIds[0]) {
+        const el = document.getElementById(fieldIds[0]);
+        (el.closest('.date-input') || el).focus();   // date fields: focus the clickable box
+    }
 }
 
 function clearErrors() {
     els.formError.hidden = true;
+    els.formError.dataset.key = '';
     document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
 }
 
-/**
- * Validates the form and, when everything is fine, shows the next step.
+/*
+ * Checks the form. Returns null when it is fine, otherwise the first problem:
+ * { message (English key), fields (ids to mark red), vars }.
  */
-function submitTrip(event) {
-    event.preventDefault();
-    clearErrors();
-
+function validateTrip() {
     const { origin, destination } = tripData;
     const start = els.startDate.value;
     const end = els.endDate.value;
 
+    // Missing fields: say exactly which ones
+    const labels = { origin: 'From', destination: 'To', startDate: 'Departure date', endDate: 'Return date' };
     const missing = [];
     if (!origin) missing.push('origin');
     if (!destination) missing.push('destination');
     if (!start) missing.push('startDate');
     if (!end) missing.push('endDate');
     if (missing.length) {
-        const cityTyped = (!origin && autocomplete.origin.input.value.trim()) ||
-                          (!destination && autocomplete.destination.input.value.trim());
-        showError(cityTyped
-            ? 'Please pick your cities from the suggestion list.'
-            : 'Please fill in origin, destination and both dates.', missing);
-        return;
+        const typedNotPicked = ['origin', 'destination'].filter(k =>
+            missing.includes(k) && autocomplete[k].input.value.trim());
+        if (typedNotPicked.length) {
+            return { message: 'Please pick your cities from the suggestion list.', fields: typedNotPicked };
+        }
+        return { message: 'Please add: {fields}.', fields: missing,
+                 vars: { fields: missing.map(k => t(labels[k])).join(', ') } };
     }
 
-    if (origin === destination || (origin.n === destination.n && origin.cc === destination.cc)) {
-        showError('Origin and destination cannot be the same. Please choose different cities.',
-                  ['destination']);
-        return;
+    const sameCity = origin === destination ||
+        (origin.n === destination.n && origin.cc === destination.cc) ||
+        (origin.a && destination.a && origin.a[0] === destination.a[0]);
+    if (sameCity) {
+        return { message: 'Origin and destination cannot be the same. Please choose different cities.',
+                 fields: ['destination'] };
     }
 
-    if (start < els.startDate.min) {
-        showError('Departure date cannot be in the past.', ['startDate']);
-        return;
+    // "today" is checked now, not when the page was opened (page left open overnight)
+    if (start < toISODate(new Date())) {
+        return { message: 'Departure date cannot be in the past.', fields: ['startDate'] };
     }
     if (end <= start) {
-        showError('Return date must be at least one day after departure.', ['endDate']);
+        return { message: 'Return date must be at least one day after departure.', fields: ['endDate'] };
+    }
+    if (nightsBetween(start, end) > MAX_NIGHTS) {
+        return { message: 'Trips can be up to {n} nights. Please choose an earlier return date.',
+                 fields: ['endDate'], vars: { n: MAX_NIGHTS } };
+    }
+    return null;
+}
+
+/*
+ * While an error is shown, re-check after every change: the message updates
+ * to the next remaining problem, and disappears once everything is fixed.
+ */
+function refreshErrors() {
+    if (els.formError.hidden) return;
+    const problem = validateTrip();
+    if (!problem) clearErrors();
+    else showError(problem.message, problem.fields, problem.vars, false);
+}
+
+/**
+ * Validates the form and, when everything is fine, shows the budget.
+ */
+function submitTrip(event) {
+    event.preventDefault();
+    clearErrors();
+
+    const problem = validateTrip();
+    if (problem) {
+        showError(problem.message, problem.fields, problem.vars);
         return;
     }
+    const { origin, destination } = tripData;
+    const start = els.startDate.value;
+    const end = els.endDate.value;
 
     els.passengers.value = String(getTravelers());
     updateRouteSummary();

@@ -33,6 +33,10 @@ const TR = {
     // Errors
     'Please pick your cities from the suggestion list.': 'Lütfen şehirleri öneri listesinden seç.',
     'Please fill in origin, destination and both dates.': 'Lütfen nereden, nereye ve iki tarihi de doldur.',
+    'Please add: {fields}.': 'Lütfen ekle: {fields}.',
+    'Departure date': 'Gidiş tarihi', 'Return date': 'Dönüş tarihi',
+    'Trips can be up to {n} nights. Please choose an earlier return date.': 'En fazla {n} gecelik seyahat hesaplanabiliyor. Lütfen daha erken bir dönüş tarihi seç.',
+    'Calculate my WayBudget': 'WayBudget\'ımı hesapla',
     'Origin and destination cannot be the same. Please choose different cities.':
         'Nereden ve nereye aynı olamaz. Lütfen farklı şehirler seç.',
     'Departure date cannot be in the past.': 'Gidiş tarihi geçmişte olamaz.',
