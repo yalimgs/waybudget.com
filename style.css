@@ -162,9 +162,21 @@ input.invalid {
 
 /* Date fields: native picker underneath, "3 April 2026" shown on top */
 .date-input { position: relative; }
-.date-input input { color: transparent; cursor: pointer; }
-.date-input input::-webkit-datetime-edit { color: transparent; }
-.date-input input:focus::-webkit-datetime-edit { color: transparent; }
+.date-input input { color: transparent; -webkit-text-fill-color: transparent; cursor: pointer; }
+/* Hide the browser's own dd/mm/yyyy text (and its placeholder and hover/focus
+   highlight) completely; our "22 October 2026" label is shown on top instead */
+.date-input input::-webkit-datetime-edit,
+.date-input input::-webkit-datetime-edit-fields-wrapper,
+.date-input input::-webkit-datetime-edit-text,
+.date-input input::-webkit-datetime-edit-day-field,
+.date-input input::-webkit-datetime-edit-month-field,
+.date-input input::-webkit-datetime-edit-year-field {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    background: transparent;
+    opacity: 0;
+}
+.date-input input::-moz-selection { background: transparent; }
 .date-display {
     position: absolute;
     left: 15px;
