@@ -227,7 +227,10 @@ const DatePicker = (() => {
         const box = (label, value, active) =>
             `<div class="dp-pill${active ? ' active' : ''}"><span>${label}</span>` +
             `<strong>${value ? shortDay(value) : '—'}</strong></div>`;
-        const n = state.start && state.end ? `<div class="dp-nights">${tn(nights(state.start, state.end), '{n} night', '{n} nights')}</div>` : '';
+        // Live count while painting the range (hover / keyboard), final once picked
+        const end = state.end || (state.picking === 'end' && state.hover > state.start ? state.hover : '');
+        const n = state.start && end
+            ? `<div class="dp-nights${state.end ? '' : ' dp-nights-preview'}">${tn(nights(state.start, end), '{n} night', '{n} nights')}</div>` : '';
         return box(t('Departure'), state.start, state.picking === 'start') +
                box(t('Return'), state.end, state.picking === 'end') + n;
     }

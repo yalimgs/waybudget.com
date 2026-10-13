@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=d9a825ec82">
+    <link rel="stylesheet" href="style.css?v=5a68cafffd">
 </head>
 <body>
     <header class="hero">
@@ -82,7 +82,10 @@
                         <span class="date-display" data-for="endDate" aria-hidden="true">Select date</span>
                     </div>
                 </div>
-                <p id="nightsNote" class="nights-note" aria-live="polite" hidden></p>
+                <div class="field nights-field" aria-live="polite">
+                    <span class="nights-spacer" aria-hidden="true">&nbsp;</span>
+                    <div id="nightsBox" class="nights-box empty"><strong id="nightsNum">–</strong><span id="nightsWord" data-i18n="nights">nights</span></div>
+                </div>
                 <div class="field travelers-field">
                     <label for="passengers" data-i18n="Travelers">Travelers</label>
                     <div class="stepper">
@@ -149,10 +152,10 @@
            <span data-i18n="Prices:">Prices:</span> <a href="https://www.aviasales.com/" target="_blank" rel="noopener">Aviasales</a>, <a href="https://www.liteapi.travel/" target="_blank" rel="noopener">LiteAPI</a></p>
     </footer>
 
-    <script src="i18n.js?v=55e5714c7a"></script>
-    <script src="datepicker.js?v=ba378d3966"></script>
+    <script src="i18n.js?v=c3d22320e8"></script>
+    <script src="datepicker.js?v=55a1ae832d"></script>
     <script src="search.js?v=c354b65ac1"></script>
     <script src="budget.js?v=04361ebaa9"></script>
-    <script src="app.js?v=5d542b9b16"></script>
+    <script src="app.js?v=f8fa8b3d21"></script>
 </body>
 </html>

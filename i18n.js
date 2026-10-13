@@ -39,7 +39,7 @@ const TR = {
     'Return date must be at least one day after departure.': 'Dönüş tarihi gidişten en az bir gün sonra olmalı.',
 
     // Summary
-    '{n} night': '{n} gece', '{n} nights': '{n} gece',
+    '{n} night': '{n} gece', '{n} nights': '{n} gece', 'night': 'gece', 'nights': 'gece',
     '{n} traveler': '{n} yolcu', '{n} travelers': '{n} yolcu',
     '{p} per person': 'kişi başı {p}',
     ' · rates of {date}': ' · {date} kuru',

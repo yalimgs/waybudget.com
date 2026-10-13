@@ -155,14 +155,12 @@ function updateDateDisplays() {
         span.textContent = value ? formatDate(value) : t('Select date');
         span.classList.toggle('empty', !value);
     });
-    // Nights summary under the date fields
-    const note = document.getElementById('nightsNote');
+    // Nights box between the dates and travelers
     const start = els.startDate.value, end = els.endDate.value;
-    if (note) {
-        const n = start && end ? nightsBetween(start, end) : 0;
-        note.hidden = n < 1;
-        note.textContent = n >= 1 ? tn(n, '{n} night', '{n} nights') : '';
-    }
+    const n = start && end ? nightsBetween(start, end) : 0;
+    document.getElementById('nightsBox').classList.toggle('empty', n < 1);
+    document.getElementById('nightsNum').textContent = n >= 1 ? n : '–';
+    document.getElementById('nightsWord').textContent = t(n === 1 ? 'night' : 'nights');
 }
 
 /* One-line trip summary shown under the budget title */
