@@ -31,8 +31,8 @@ function rooms(travelers) {
     return out;
 }
 
-/* Whitelabel list of hotels in the city: cheapest first (sorting=2), or
-   most stars first for luxury (sorting=5) */
+/* Whitelabel list of hotels in the city: cheapest first (sorting=2),
+   best rated first (7) or most stars first (5) */
 function listUrl(place, p, travelers, sorting = 2) {
     if (!place || !place.id) return null;
     const r = rooms(travelers).map(x => ({ adults: x.adults, children: [] }));
@@ -217,7 +217,8 @@ export async function onRequestGet(context) {
     const data = await res.clone().json().catch(() => null);
     if (!data || !data.found) return res;
     for (const t of ['budget', 'standard', 'luxury']) {
-        const list = listUrl(data.place, p, travelers, t === 'luxury' ? 5 : 2);
+        // budget: cheapest first, standard: best rated first, luxury: most stars first
+        const list = listUrl(data.place, p, travelers, { budget: 2, standard: 7, luxury: 5 }[t]);
         const ex = data[t] && data[t].example;
         const url = list || (ex && bookingUrl(ex.id, p, travelers));
         if (url) data[t].book = { url, list: !!list, provider: 'LiteAPI' };

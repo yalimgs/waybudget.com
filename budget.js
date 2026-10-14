@@ -195,7 +195,7 @@ function calculateBudget(trip, choices, live = {}) {
             key: 'flights', label: 'Flights',
             detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares), noDirectNote].filter(Boolean).join(' · ')}` +
                     ` · ${travelers} × ${money(perPerson)}`,
-            amount: roundMoney(perPerson) * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
+            amount: roundMoney(perPerson) * travelers, kind, source, link: bookingLink(fl.book, travelers, choices.flights === 'premium'), linkLabel: 'See flights'
         });
     } else if (via) {
         // Two flights through a bigger airport: the long one has live fares,
@@ -220,7 +220,7 @@ function calculateBudget(trip, choices, live = {}) {
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind: 'estimate',
             source: t('{a} ⇄ {b}: {n} fares seen recently (Aviasales)', { a, b, n: via.main.fares }),
-            link: bookingLink(live.flights.book, travelers), linkLabel: 'See flights'
+            link: bookingLink(live.flights.book, travelers, choices.flights === 'premium'), linkLabel: 'See flights'
         });
     } else {
         // Small airports cost more than the distance suggests (connections)
@@ -234,7 +234,7 @@ function calculateBudget(trip, choices, live = {}) {
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
             source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
-            link: bookingLink(live.flights && live.flights.book, travelers), linkLabel: 'See flights'
+            link: bookingLink(live.flights && live.flights.book, travelers, choices.flights === 'premium'), linkLabel: 'See flights'
         });
     }
 
@@ -364,10 +364,11 @@ function stopsText(n) {
  * "See flights" link from the flight API (provider-neutral: the API decides
  * where to book). Null until the API has answered.
  */
-function bookingLink(book, travelers) {
+function bookingLink(book, travelers, premium = false) {
     if (!book || !book.url) return null;
     const adults = Math.min(Math.max(travelers, 1), book.maxAdults || 9);
-    return book.url.replace('{adults}', adults);
+    // Aviasales: "c" before the passenger count searches business class
+    return book.url.replace('{adults}', (premium && /aviasales/.test(book.url) ? 'c' : '') + adults);
 }
 
 function shortRange(depIso, retIso) {
@@ -448,7 +449,7 @@ function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
                    `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&travelers=${trip.travelers}` +
                    `&city=${encodeURIComponent(trip.destination.n.replace(/ \(.*\)$/, ''))}` +
-                   `&country=${encodeURIComponent(trip.destination.c)}&v=10`);
+                   `&country=${encodeURIComponent(trip.destination.c)}&v=11`);
 }
 
 /* ------------------------------------------------------------- Currency -- */
