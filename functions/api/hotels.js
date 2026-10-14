@@ -11,7 +11,7 @@
 //   2 hotels -> budget = cheaper one, standard and luxury = pricier one
 // count = hotels found (shown to the user), radiusKm = search radius used.
 // book.url = our booking site's list of hotels in the city (&city=, &country=),
-// cheapest first, for the dates and group size (&travelers=); falls back to the
+// cheapest first (luxury: most stars first), for the dates and group size (&travelers=); falls back to the
 // tier's example hotel. Rates are cached at the edge for 1 hour; the booking
 // links are added after the cache.
 // ============================================================================
@@ -31,13 +31,14 @@ function rooms(travelers) {
     return out;
 }
 
-/* Whitelabel list of hotels in the city, cheapest first (sorting=2) */
-function listUrl(place, p, travelers) {
+/* Whitelabel list of hotels in the city: cheapest first (sorting=2), or
+   most stars first for luxury (sorting=5) */
+function listUrl(place, p, travelers, sorting = 2) {
     if (!place || !place.id) return null;
     const r = rooms(travelers).map(x => ({ adults: x.adults, children: [] }));
     return `${WHITELABEL}/hotels?placeId=${encodeURIComponent(place.id)}&name=${encodeURIComponent(place.name || '')}` +
            `&checkin=${p.checkin}&checkout=${p.checkout}&rooms=${r.length}&adults=${travelers}` +
-           `&occupancies=${encodeURIComponent(btoa(JSON.stringify(r)))}&sorting=2`;
+           `&occupancies=${encodeURIComponent(btoa(JSON.stringify(r)))}&sorting=${sorting}`;
 }
 
 /* Google place id of the city, which the whitelabel search needs */
@@ -215,8 +216,8 @@ export async function onRequestGet(context) {
     // Add booking links for this visitor's group size (not part of the cache)
     const data = await res.clone().json().catch(() => null);
     if (!data || !data.found) return res;
-    const list = listUrl(data.place, p, travelers);
     for (const t of ['budget', 'standard', 'luxury']) {
+        const list = listUrl(data.place, p, travelers, t === 'luxury' ? 5 : 2);
         const ex = data[t] && data[t].example;
         const url = list || (ex && bookingUrl(ex.id, p, travelers));
         if (url) data[t].book = { url, list: !!list, provider: 'LiteAPI' };

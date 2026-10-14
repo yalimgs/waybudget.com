@@ -7,7 +7,8 @@
 //   standard: typical fare = median of fares seen, direct preferred
 //             (1 fare: same as economy; 2 fares: the pricier one)
 //   fares:    how many fares were found for these dates
-//   via:      no fares on the route: { hub, leg1, leg2 } through a bigger airport (&via=)
+//   via:      no fares on the route: { hub, side, main, other } through a bigger
+//             airport near the destination (&via=) or the origin (&viaFrom=)
 //   business: cheapest business-class fare seen (null if none)
 //   book:     where to send the user to book ({ url with {adults}, maxAdults })
 // Exact dates are tried first; if nothing was seen for those dates, the
@@ -151,17 +152,22 @@ async function routeFares(env, origin, destination, depart, ret) {
 
 /*
  * No fares at all for a small airport (nobody searches IST -> JGD): price it
- * as two flights through a bigger airport in the same country (&via=PEK,HRB).
- * leg1 = origin -> hub (live), leg2 = hub -> destination (live if seen,
- * else null and the page estimates it from distance).
+ * as two flights through a bigger airport in the same country.
+ *   side 'dest'   (&via=PEK,HRB):     origin -> hub -> destination
+ *   side 'origin' (&viaFrom=PEK,HRB): origin -> hub -> destination, hub near the origin
+ * main  = the long (international) flight, which must have live fares
+ * other = the short domestic flight: live if seen, else null and the page
+ *         estimates it from distance.
  */
-async function viaHub(env, origin, destination, depart, ret, hubs) {
+async function viaHub(env, origin, destination, depart, ret, hubs, side) {
     for (const hub of hubs) {
         if (hub === origin || hub === destination) continue;
-        const leg1 = await routeFares(env, origin, hub, depart, ret).catch(() => null);
-        if (!leg1) continue;
-        const leg2 = await routeFares(env, hub, destination, depart, ret).catch(() => null);
-        return { hub, leg1, leg2 };
+        const [mainFrom, mainTo, otherFrom, otherTo] = side === 'dest'
+            ? [origin, hub, hub, destination] : [hub, destination, origin, hub];
+        const main = await routeFares(env, mainFrom, mainTo, depart, ret).catch(() => null);
+        if (!main) continue;
+        const other = await routeFares(env, otherFrom, otherTo, depart, ret).catch(() => null);
+        return { hub, side, main, other };
     }
     return null;
 }
@@ -183,7 +189,8 @@ export async function onRequestGet(context) {
     // fares can't be fetched (the page then shows an estimate + the link)
     const book = bookingLink(origin, destination, depart, ret);
     // Bigger airports to route through when the route itself has no fares
-    const hubs = (q.get('via') || '').toUpperCase().split(',').filter(isIata).slice(0, 3);
+    const hubList = name => (q.get(name) || '').toUpperCase().split(',').filter(isIata).slice(0, 3);
+    const hubs = hubList('via'), hubsFrom = hubList('viaFrom');
 
     return cached(context, TTL, async () => {
         try {
@@ -191,7 +198,8 @@ export async function onRequestGet(context) {
             const businessFare = business(env, origin, destination, depart, ret);   // in parallel
             const found = await routeFares(env, origin, destination, depart, ret);
             if (!found) {
-                const via = hubs.length ? await viaHub(env, origin, destination, depart, ret, hubs) : null;
+                const via = (hubs.length ? await viaHub(env, origin, destination, depart, ret, hubs, 'dest') : null) ||
+                            (hubsFrom.length ? await viaHub(env, origin, destination, depart, ret, hubsFrom, 'origin') : null);
                 return via ? { found: false, via, book } : { found: false, book };
             }
             const { match, ...result } = found;

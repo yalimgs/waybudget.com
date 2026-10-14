@@ -157,7 +157,7 @@ function calculateBudget(trip, choices, live = {}) {
         return ' · ' + t('closest fare seen: {dates}', { dates: shortRange(dep, ret) });
     };
     const fl = live.flights && live.flights.found ? live.flights : null;
-    const via = !fl && live.flights && live.flights.via ? live.flights.via : null;
+    const via = !fl && live.flights && live.flights.via && live.flights.via.main ? live.flights.via : null;
     // "only 1 fare found" / "2 fares found" / "14 fares found"
     const fareCount = n => n === 1 ? t('only 1 fare found') : t('{n} fares found', { n });
     if (fl) {
@@ -189,24 +189,27 @@ function calculateBudget(trip, choices, live = {}) {
             amount: perPerson * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
         });
     } else if (via) {
-        // Two flights: origin -> hub (live) + hub -> destination (live or by distance)
+        // Two flights through a bigger airport: the long one has live fares,
+        // the short domestic one is live if seen, else estimated from distance
         const hubPos = airportPos(via.hub);
-        const legKm = hubPos ? distanceKm(hubPos, { lat: destination.al[0], lon: destination.al[1] }) : km * 0.2;
-        const leg = (l, tier) => tier === 'economy' ? l.economy.price : l.standard.price;
+        const smallEnd = via.side === 'dest' ? destination : origin;
+        const legKm = hubPos ? distanceKm(hubPos, { lat: smallEnd.al[0], lon: smallEnd.al[1] }) : km * 0.2;
         const tier = choices.flights === 'economy' ? 'economy' : 'standard';
-        const leg2 = via.leg2 ? leg(via.leg2, tier) : estimateFlightPerPerson(legKm, tier);
-        let perPerson = leg(via.leg1, tier) + leg2;
+        const other = via.other ? via.other[tier].price : estimateFlightPerPerson(legKm, tier);
+        let perPerson = via.main[tier].price + other;
         if (choices.flights === 'premium') {
             const [, factor] = M.businessFactor.find(([maxKm]) => km <= maxKm);
             perPerson *= factor;
         }
+        const [a, b] = via.side === 'dest' ? [origin.a[0], via.hub] : [via.hub, destination.a[0]];
         items.push({
             key: 'flights', label: 'Flights',
             detail: `${route} · ` + t('via {hub}', { hub: via.hub }) + ' · ' +
-                    t(via.leg2 ? 'no fares for this route, priced as 2 flights' : 'no fares for this route, live fare to {hub} + domestic flight estimate', { hub: via.hub }) +
+                    t(via.other ? 'no fares for this route, priced as 2 flights'
+                                : 'no fares for this route, live fare {a}–{b} + domestic flight estimate', { a, b }) +
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: perPerson * travelers, kind: 'estimate',
-            source: t('{a} ⇄ {hub}: {n} fares seen recently (Aviasales)', { a: origin.a[0], hub: via.hub, n: via.leg1.fares }),
+            source: t('{a} ⇄ {b}: {n} fares seen recently (Aviasales)', { a, b, n: via.main.fares }),
             link: bookingLink(live.flights.book, travelers), linkLabel: 'See flights'
         });
     } else {
@@ -403,6 +406,7 @@ const MAIN_HUB = {
  */
 function viaHubs(dest) {
     const out = [];
+    if (dest.l === 1) return out;                  // big airports have their own fares
     if (typeof allCities !== 'undefined') {
         allCities.filter(c => c.cc === dest.cc && c.l === 1 && c.a[0] !== dest.a[0])
             .map(c => ({ code: c.a[0], km: distanceKm(c, dest) }))
@@ -422,9 +426,11 @@ function airportPos(code) {
 }
 
 function fetchFlights(trip) {
-    const via = viaHubs(trip.destination).join(',');
+    // Hubs near a small destination airport, then near a small origin airport
+    const via = viaHubs(trip.destination).join(','), viaFrom = viaHubs(trip.origin).join(',');
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
-                   `&depart=${trip.start}&return=${trip.end}${via ? `&via=${via}` : ''}&v=8`);
+                   `&depart=${trip.start}&return=${trip.end}${via ? `&via=${via}` : ''}` +
+                   `${viaFrom ? `&viaFrom=${viaFrom}` : ''}&v=9`);
 }
 
 function fetchHotels(trip) {
