@@ -504,12 +504,11 @@ async function shareTrip() {
     if (!currentTrip) return;
     const url = shareUrl();
     const msg = document.getElementById('shareMsg');
-    const text = t('{a} → {b} trip budget: {total}', {
-        a: currentTrip.origin.n, b: currentTrip.destination.n,
-        total: document.getElementById('budgetTotal').textContent });
     // Phones: the system share sheet (WhatsApp, Messages...). Elsewhere: copy the link.
+    // Only the link is shared (no extra text), so it stays a clean, clickable
+    // link in every app it is pasted into.
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-        try { await navigator.share({ title: 'WayBudget', text, url }); return; }
+        try { await navigator.share({ url }); return; }
         catch (e) { if (e && e.name === 'AbortError') return; }
     }
     let copied = false;

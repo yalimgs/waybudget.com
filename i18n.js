@@ -70,7 +70,6 @@ const TR = {
     'See hotels': 'Otelleri gör',
     'Share this budget': 'Bu bütçeyi paylaş',
     'Link copied': 'Link kopyalandı',
-    '{a} → {b} trip budget: {total}': '{a} → {b} seyahat bütçesi: {total}',
     'The dates in this link have passed. Please pick new dates.': 'Bu linkteki tarihler geçmiş. Lütfen yeni tarih seç.',
     'only 1 fare found': 'sadece 1 fiyat bulundu',
     '{n} fares found': '{n} fiyat bulundu',
