@@ -5,6 +5,9 @@
 // by Aviasales), not a live booking quote.
 //   economy:  cheapest fare seen (any number of stops)
 //   standard: typical fare = median of fares seen, direct preferred
+//             (1 fare: same as economy; 2 fares: the pricier one)
+//   fares:    how many fares were found for these dates
+//   via:      no fares on the route: { hub, leg1, leg2 } through a bigger airport (&via=)
 //   business: cheapest business-class fare seen (null if none)
 //   book:     where to send the user to book ({ url with {adults}, maxAdults })
 // Exact dates are tried first; if nothing was seen for those dates, the
@@ -96,13 +99,16 @@ function fare(f) {
 
 /*
  * From all fares seen, keep the ones closest to the requested trip (a 2-day
- * trip on the 10th says little about an 11-day trip on the 3rd), then:
- *   economy  = cheapest of them
- *   standard = median of them, using direct flights when there are enough
+ * trip on the 10th says little about an 11-day trip on the 3rd), then use
+ * every real fare we have:
+ *   1 fare   -> economy = standard = that fare
+ *   2 fares  -> economy = cheaper one, standard = pricier one
+ *   3+ fares -> economy = cheapest, standard = median (direct preferred)
+ * fares = how many fares the tiers were taken from (shown to the user).
  */
 function summarize(list, depart, ret) {
     const want = { dep: Date.parse(depart), len: (Date.parse(ret) - Date.parse(depart)) / DAY };
-    const all = list.filter(x => typeof x.price === 'number' && x.departure_at && x.return_at)
+    const all = list.filter(x => typeof x.price === 'number' && x.price > 0 && x.departure_at && x.return_at)
         .map(x => {
             const dep = Date.parse(x.departure_at.slice(0, 10));
             const len = (Date.parse(x.return_at.slice(0, 10)) - dep) / DAY;
@@ -111,14 +117,11 @@ function summarize(list, depart, ret) {
     const tiers = [f => f.dDep <= 4 && f.dLen <= 2, f => f.dDep <= 10 && f.dLen <= 4,
                    f => f.dLen <= 5, () => true];
     const pools = tiers.map(ok => all.filter(ok).map(f => f.x).sort((a, b) => a.price - b.price));
-
-    // Economy: cheapest among the closest matches
     const closest = pools.find(p => p.length);
     if (!closest) return null;
 
     // "What most people buy": direct flights if there are enough of them,
     // otherwise the fares with the fewest stops; middle of that range
-    // (ignores rock-bottom promos and last-minute extremes).
     const stops = f => Math.max(f.transfers || 0, f.return_transfers || 0);
     const median = arr => {
         const fewest = Math.min(...arr.map(stops));
@@ -127,25 +130,40 @@ function summarize(list, depart, ret) {
         const pick = base.length >= 3 ? base : arr;
         return pick[Math.floor((pick.length - 1) / 2)];
     };
+    const n = closest.length;
     const economy = closest[0];
+    const standard = n === 1 ? economy : n === 2 ? closest[1] : median(closest);
+    return { economy: fare(economy), standard: fare(standard), fares: n };
+}
 
-    // Standard = typical fare. Enough fares near the dates: their median.
-    if (closest.length >= 3) {
-        const m = median(closest);
-        if (m.price > economy.price) {
-            return { economy: fare(economy), standard: fare(m), fares: closest.length };
-        }
+/* Fares for one route: exact dates first, else the same months */
+async function routeFares(env, origin, destination, depart, ret) {
+    let match = 'exact';
+    let list = await query(env, { origin, destination, departure_at: depart, return_at: ret });
+    if (!list.length) {
+        match = 'month';
+        list = await query(env, { origin, destination,
+            departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
     }
-    // Otherwise learn how much a typical fare costs over the cheapest one on
-    // this route (from a wider date window) and apply that to Economy.
-    const sample = pools.find(p => p.length >= 5) || pools[pools.length - 1];
-    const ratio = sample.length >= 3 ? median(sample).price / sample[0].price : 0;
-    const factor = Math.min(2, Math.max(1.15, ratio || 1.25));
-    return {
-        economy: fare(economy),
-        standard: { price: Math.round(economy.price * factor), derived: true },
-        fares: sample.length
-    };
+    const result = summarize(list, depart, ret);
+    return result ? { ...result, match } : null;
+}
+
+/*
+ * No fares at all for a small airport (nobody searches IST -> JGD): price it
+ * as two flights through a bigger airport in the same country (&via=PEK,HRB).
+ * leg1 = origin -> hub (live), leg2 = hub -> destination (live if seen,
+ * else null and the page estimates it from distance).
+ */
+async function viaHub(env, origin, destination, depart, ret, hubs) {
+    for (const hub of hubs) {
+        if (hub === origin || hub === destination) continue;
+        const leg1 = await routeFares(env, origin, hub, depart, ret).catch(() => null);
+        if (!leg1) continue;
+        const leg2 = await routeFares(env, hub, destination, depart, ret).catch(() => null);
+        return { hub, leg1, leg2 };
+    }
+    return null;
 }
 
 export async function onRequestGet(context) {
@@ -164,20 +182,19 @@ export async function onRequestGet(context) {
     // The booking link needs no upstream call, so it is returned even when
     // fares can't be fetched (the page then shows an estimate + the link)
     const book = bookingLink(origin, destination, depart, ret);
+    // Bigger airports to route through when the route itself has no fares
+    const hubs = (q.get('via') || '').toUpperCase().split(',').filter(isIata).slice(0, 3);
 
     return cached(context, TTL, async () => {
         try {
             // One request returns up to 100 fares (direct and with stops)
-            let match = 'exact';
             const businessFare = business(env, origin, destination, depart, ret);   // in parallel
-            let list = await query(env, { origin, destination, departure_at: depart, return_at: ret });
-            if (!list.length) {
-                match = 'month';
-                list = await query(env, { origin, destination,
-                    departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
+            const found = await routeFares(env, origin, destination, depart, ret);
+            if (!found) {
+                const via = hubs.length ? await viaHub(env, origin, destination, depart, ret, hubs) : null;
+                return via ? { found: false, via, book } : { found: false, book };
             }
-            const result = summarize(list, depart, ret);
-            if (!result) return { found: false, book };
+            const { match, ...result } = found;
             // Sanity check: a business fare far outside 1.3–6× the typical
             // economy fare is more likely a data glitch than a real price
             let biz = await businessFare;

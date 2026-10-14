@@ -1,17 +1,24 @@
 // ============================================================================
 // GET /api/hotels?cc=IT&city=Rome&lat=41.89&lon=12.48&checkin=2026-11-03&checkout=2026-11-14&adults=2
-// Live hotel rates from LiteAPI for one room, around the city centre.
+// Live hotel rates from LiteAPI for one room, around the city centre
+// (6 km; widened to 20 km when fewer than 3 hotels are found there).
 // Returns price per room per night (USD) for three tiers:
 //   budget   = cheapest decent hotel (7+/10, 20+ reviews)
 //   standard = typical pick: median of the most-reviewed, well-rated 3–4★ hotels
 //   luxury   = cheapest hotel in the luxury segment (5★, else top-rated 4★)
-// plus one example hotel per tier, and where to book it (book.url, filled in
-// per request for the group size given in &travelers=). Rates are cached at
-// the edge for 1 hour; the booking links are added after the cache.
+// With fewer than 3 hotels every real price is still used:
+//   1 hotel  -> all tiers = that hotel
+//   2 hotels -> budget = cheaper one, standard and luxury = pricier one
+// count = hotels found (shown to the user), radiusKm = search radius used.
+// book.url = our booking site's list of hotels in the city (&city=, &country=),
+// cheapest first, for the dates and group size (&travelers=); falls back to the
+// tier's example hotel. Rates are cached at the edge for 1 hour; the booking
+// links are added after the cache.
 // ============================================================================
 import { cached, json, isDate } from '../_lib/cache.js';
 
 const API = 'https://api.liteapi.travel/v3.0/hotels/rates';
+const PLACES = 'https://api.liteapi.travel/v3.0/data/places';
 const TTL = 3600;
 
 // Our LiteAPI whitelabel booking site (bookings there earn our commission)
@@ -22,6 +29,29 @@ function rooms(travelers) {
     const out = [];
     for (let left = travelers; left > 0; left -= 2) out.push({ adults: Math.min(2, left) });
     return out;
+}
+
+/* Whitelabel list of hotels in the city, cheapest first (sorting=2) */
+function listUrl(place, p, travelers) {
+    if (!place || !place.id) return null;
+    const r = rooms(travelers).map(x => ({ adults: x.adults, children: [] }));
+    return `${WHITELABEL}/hotels?placeId=${encodeURIComponent(place.id)}&name=${encodeURIComponent(place.name || '')}` +
+           `&checkin=${p.checkin}&checkout=${p.checkout}&rooms=${r.length}&adults=${travelers}` +
+           `&occupancies=${encodeURIComponent(btoa(JSON.stringify(r)))}&sorting=2`;
+}
+
+/* Google place id of the city, which the whitelabel search needs */
+async function findPlace(env, city, country) {
+    if (!city) return null;
+    try {
+        const url = `${PLACES}?textQuery=${encodeURIComponent(country ? `${city}, ${country}` : city)}`;
+        const res = await fetch(url, { headers: { 'X-API-Key': env.LITEAPI_KEY, accept: 'application/json' } });
+        if (!res.ok) return null;
+        const first = ((await res.json()).data || [])[0];
+        return first && first.placeId ? { id: first.placeId, name: city } : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 /* Whitelabel hotel page for the same dates and group */
@@ -36,7 +66,7 @@ function nightsBetween(a, b) {
     return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 }
 
-async function fetchRates(env, p) {
+async function fetchRates(env, p, radius) {
     const body = {
         checkin: p.checkin,
         checkout: p.checkout,
@@ -45,7 +75,7 @@ async function fetchRates(env, p) {
         occupancies: [{ adults: p.adults }],
         latitude: p.lat,
         longitude: p.lon,
-        radius: 6000,
+        radius,
         limit: 200,
         maxRatesPerHotel: 1,
         includeHotelData: true,
@@ -88,6 +118,7 @@ export async function onRequestGet(context) {
         checkin: q.get('checkin'), checkout: q.get('checkout'),
         adults: Math.min(4, Math.max(1, parseInt(q.get('adults'), 10) || 2))
     };
+    const city = (q.get('city') || '').slice(0, 80), country = (q.get('country') || '').slice(0, 80);
     if (!isFinite(p.lat) || !isFinite(p.lon) || !isDate(p.checkin) || !isDate(p.checkout)) {
         return json({ error: 'lat, lon, checkin, checkout are required' }, 400);
     }
@@ -99,34 +130,53 @@ export async function onRequestGet(context) {
 
     const res = await cached(context, TTL, async () => {
         try {
-            const r = await fetchRates(env, p);
-            const info = new Map((r.hotels || []).map(h => [h.id, h]));
-            let list = [];
-            for (const entry of r.data || []) {
-                const total = offerTotal(entry);
-                if (!total) continue;
-                const h = info.get(entry.hotelId) || entry.hotel || {};
-                list.push({
-                    id: entry.hotelId || h.id || null,
-                    name: h.name || null,
-                    stars: Number(h.stars ?? h.starRating) || null,
-                    rating: Number(h.rating) || null,
-                    reviews: Number(h.review_count) || 0,
-                    lat: Number(h.latitude) || null,
-                    lon: Number(h.longitude) || null,
-                    perNight: Math.round((total / nights) * 100) / 100
-                });
+            const place = findPlace(env, city, country);          // in parallel
+            // Not hotels: campsites, caravan parks
+            const NOT_HOTEL = /camping|campsite|campground|caravan|glamping|\bcamp\b/i;
+            const hotelsWithin = async radius => {
+                const r = await fetchRates(env, p, radius);
+                const info = new Map((r.hotels || []).map(h => [h.id, h]));
+                const out = [];
+                for (const entry of r.data || []) {
+                    const total = offerTotal(entry);
+                    if (!total) continue;
+                    const h = info.get(entry.hotelId) || entry.hotel || {};
+                    if (NOT_HOTEL.test(h.name || '')) continue;
+                    out.push({
+                        id: entry.hotelId || h.id || null,
+                        name: h.name || null,
+                        stars: Number(h.stars ?? h.starRating) || null,
+                        rating: Number(h.rating) || null,
+                        reviews: Number(h.review_count) || 0,
+                        lat: Number(h.latitude) || null,
+                        lon: Number(h.longitude) || null,
+                        perNight: Math.round((total / nights) * 100) / 100
+                    });
+                }
+                return out;
+            };
+            let radiusKm = 6;
+            let list = await hotelsWithin(6000);
+            if (list.length < 3) {
+                const wider = await hotelsWithin(20000);
+                if (wider.length > list.length) { list = wider; radiusKm = 20; }
             }
-            if (list.length < 3) return { found: false, count: list.length };
+            const placeInfo = await place;
+            const tier = h => ({ perNight: h.perNight,
+                                 example: h.name ? { id: h.id, name: h.name, stars: h.stars, rating: h.rating,
+                                                     lat: h.lat, lon: h.lon } : null });
+            const base = { currency: 'USD', nights, count: list.length, radiusKm, place: placeInfo,
+                           source: 'LiteAPI live rates' };
+            if (!list.length) return { found: false, ...base };
+            if (list.length < 3) {
+                const [lo, hi] = list.slice().sort((a, b) => a.perNight - b.perNight);
+                const top = hi || lo;
+                return { found: true, ...base, budget: tier(lo), standard: tier(top), luxury: tier(top) };
+            }
 
             const byPrice = arr => arr.slice().sort((a, b) => a.perNight - b.perNight);
             const minOf = arr => byPrice(arr)[0];
             const medianOf = arr => byPrice(arr)[Math.floor((arr.length - 1) / 2)];
-
-            // Not hotels: campsites, caravan parks
-            const NOT_HOTEL = /camping|campsite|campground|caravan|glamping|\bcamp\b/i;
-            list = list.filter(h => !NOT_HOTEL.test(h.name || ''));
-            if (list.length < 3) return { found: false, count: list.length };
 
             // Budget: the cheapest hotel that is still decent (7+/10, 20+ reviews)
             const decent = list.filter(h => h.rating >= 7 && h.reviews >= 20);
@@ -155,25 +205,21 @@ export async function onRequestGet(context) {
                 : pricier.length ? pricier[Math.floor((pricier.length - 1) / 2)]
                 : byPrice(list)[list.length - 1];
 
-            const tier = h => ({ perNight: h.perNight,
-                                 example: h.name ? { id: h.id, name: h.name, stars: h.stars, rating: h.rating,
-                                                     lat: h.lat, lon: h.lon } : null });
-            return {
-                found: true, currency: 'USD', nights, count: list.length,
-                budget: tier(budgetHotel), standard: tier(standardHotel), luxury: tier(luxuryHotel),
-                source: 'LiteAPI live rates'
-            };
+            return { found: true, ...base,
+                     budget: tier(budgetHotel), standard: tier(standardHotel), luxury: tier(luxuryHotel) };
         } catch (e) {
             return { error: e.message };
         }
-    }, ['travelers']);
+    }, ['travelers', 'city', 'country']);
 
     // Add booking links for this visitor's group size (not part of the cache)
     const data = await res.clone().json().catch(() => null);
     if (!data || !data.found) return res;
+    const list = listUrl(data.place, p, travelers);
     for (const t of ['budget', 'standard', 'luxury']) {
         const ex = data[t] && data[t].example;
-        if (ex) data[t].book = { url: bookingUrl(ex.id, p, travelers), provider: 'LiteAPI' };
+        const url = list || (ex && bookingUrl(ex.id, p, travelers));
+        if (url) data[t].book = { url, list: !!list, provider: 'LiteAPI' };
     }
     return json(data, 200, TTL);
 }
