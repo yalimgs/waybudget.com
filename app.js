@@ -327,9 +327,11 @@ function savePrefs() {
     try {
         localStorage.setItem('wb-choices', JSON.stringify(choices));
         localStorage.setItem('wb-currency', displayCurrency);
+        localStorage.setItem('wb-direct', directOnly ? '1' : '0');
     } catch (e) { /* storage blocked */ }
 }
 let choices = { ...BUDGET_MODEL.presets.standard };
+let directOnly = false;                 // "Only direct flights" switch
 
 const ITEM_ICONS = { flights: '✈️', hotel: '🏨', food: '🍽️', transfer: '🚕', local: '🚇' };
 const KIND_LABELS = { live: 'Live', estimate: 'Estimate', rough: 'Approx.', loading: 'Working…', none: '' };
@@ -338,7 +340,7 @@ async function renderBudget() {
     if (!currentTrip) return;
     await pricesReady;
 
-    const result = calculateBudget(currentTrip, choices, liveData);
+    const result = calculateBudget({ ...currentTrip, directOnly }, choices, liveData);
     const list = document.getElementById('budgetItems');
     list.innerHTML = '';
 
@@ -399,6 +401,20 @@ async function renderBudget() {
             });
             li._choices = group;
         }
+        // "Only direct flights" switch under the flight options
+        if (item.key === 'flights' && choices.flights !== 'none') {
+            const sw = document.createElement('label');
+            sw.className = 'direct-switch';
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = directOnly;
+            box.setAttribute('role', 'switch');
+            box.addEventListener('change', () => { directOnly = box.checked; savePrefs(); renderBudget(); });
+            const txt = document.createElement('span');
+            txt.textContent = t('Only direct flights');
+            sw.append(box, txt);
+            li._direct = sw;
+        }
 
         const amount = document.createElement('span');
         amount.className = 'item-amount';
@@ -406,6 +422,7 @@ async function renderBudget() {
 
         li.append(icon, body, amount);
         if (li._choices) li.appendChild(li._choices);   // own row under the text
+        if (li._direct) li.appendChild(li._direct);
         list.appendChild(li);
     });
 
@@ -420,6 +437,7 @@ async function renderBudget() {
 function setupBudgetControls() {
     const prefs = loadPrefs();
     choices = prefs.choices;
+    try { directOnly = localStorage.getItem('wb-direct') === '1'; } catch (e) { /* storage blocked */ }
     displayCurrency = prefs.currency;
     document.getElementById('currency').value = displayCurrency;
     syncPresetTabs();
@@ -496,6 +514,7 @@ function shareUrl() {
     u.searchParams.set('p', String(trip.travelers));
     u.searchParams.set('c', SHARE_ITEMS.map(k => choices[k]).join('.'));
     u.searchParams.set('cur', displayCurrency);
+    if (directOnly) u.searchParams.set('dir', '1');
     u.searchParams.set('lang', LANG);
     return u.toString();
 }
@@ -556,6 +575,7 @@ async function openSharedTrip() {
         if ((BUDGET_MODEL.options[k] || []).some(([v]) => v === shared[i])) choices[k] = shared[i];
     });
     syncPresetTabs();
+    directOnly = q.get('dir') === '1';
     const cur = q.get('cur');
     if (cur && document.querySelector(`#currency option[value="${cur}"]`)) {
         displayCurrency = cur;

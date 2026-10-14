@@ -156,7 +156,13 @@ function calculateBudget(trip, choices, live = {}) {
         if (dep === trip.start && ret === trip.end) return '';
         return ' · ' + t('closest fare seen: {dates}', { dates: shortRange(dep, ret) });
     };
-    const fl = live.flights && live.flights.found ? live.flights : null;
+    const all = live.flights && live.flights.found ? live.flights : null;
+    // "Only direct flights": the direct-only fares when any were seen
+    const directOnly = !!trip.directOnly;
+    const noDirect = directOnly && !live.loadingFlights && !(all && all.direct);
+    const fl = all && directOnly && all.direct
+        ? { ...all, ...all.direct, business: all.direct.business, book: all.book } : all;
+    const noDirectNote = noDirect ? t('no direct flights found, showing flights with stops') : '';
     const rawVia = !fl && live.flights && live.flights.via;
     const via = rawVia && rawVia.main ? rawVia
         : rawVia && rawVia.leg1 ? { hub: rawVia.hub, side: 'dest', main: rawVia.leg1, other: rawVia.leg2 } : null;
@@ -187,7 +193,7 @@ function calculateBudget(trip, choices, live = {}) {
         }
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares)].filter(Boolean).join(' · ')}` +
+            detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares), noDirectNote].filter(Boolean).join(' · ')}` +
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
         });
@@ -210,6 +216,7 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `${route} · ` + t('via {hub}', { hub: via.hub }) + ' · ' +
                     t(via.other ? 'no fares for this route, priced as 2 flights'
                                 : 'no fares for this route, live fare {a}–{b} + domestic flight estimate', { a, b }) +
+                    (noDirect ? ' · ' + t('no direct flights found') : '') +
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind: 'estimate',
             source: t('{a} ⇄ {b}: {n} fares seen recently (Aviasales)', { a, b, n: via.main.fares }),
@@ -223,6 +230,7 @@ function calculateBudget(trip, choices, live = {}) {
             key: 'flights', label: 'Flights',
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km` +
                     (live.loadingFlights ? '' : ' · ' + t('no fares found, check the live price')) +
+                    (noDirect ? ' · ' + t('no direct flights found') : '') +
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
             source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
@@ -433,7 +441,7 @@ function fetchFlights(trip) {
     const via = viaHubs(trip.destination).join(','), viaFrom = viaHubs(trip.origin).join(',');
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
                    `&depart=${trip.start}&return=${trip.end}${via ? `&via=${via}` : ''}` +
-                   `${viaFrom ? `&viaFrom=${viaFrom}` : ''}&v=10`);
+                   `${viaFrom ? `&viaFrom=${viaFrom}` : ''}&v=11`);
 }
 
 function fetchHotels(trip) {

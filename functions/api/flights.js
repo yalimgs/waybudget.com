@@ -7,6 +7,7 @@
 //   standard: typical fare = median of fares seen, direct preferred
 //             (1 fare: same as economy; 2 fares: the pricier one)
 //   fares:    how many fares were found for these dates
+//   direct:   the same economy/standard/fares from direct flights only (null: none seen)
 //   via:      no fares on the route: { hub, side, main, other } through a bigger
 //             airport near the destination (&via=) or the origin (&viaFrom=)
 //   business: cheapest business-class fare seen (null if none)
@@ -147,7 +148,10 @@ async function routeFares(env, origin, destination, depart, ret) {
             departure_at: depart.slice(0, 7), return_at: ret.slice(0, 7) });
     }
     const result = summarize(list, depart, ret);
-    return result ? { ...result, match } : null;
+    if (!result) return null;
+    // Same tiers from direct flights only (no stops either way); null if none seen
+    const isDirect = x => (x.transfers || 0) === 0 && (x.return_transfers || 0) === 0;
+    return { ...result, match, direct: summarize(list.filter(isDirect), depart, ret) };
 }
 
 /*
@@ -208,6 +212,7 @@ export async function onRequestGet(context) {
             let biz = await businessFare;
             const ref = result.standard.price;
             if (biz && (biz.price < ref * 1.3 || biz.price > ref * 6)) biz = null;
+            if (result.direct) result.direct.business = biz && biz.transfers === 0 ? biz : null;
             return { found: true, match, currency: 'USD', ...result, business: biz, book,
                      source: 'Aviasales (prices seen recently)' };
         } catch (e) {

@@ -378,6 +378,23 @@ input.invalid {
     background: #fff;
 }
 .budget-items { list-style: none; margin: 0; padding: 0; }
+.direct-switch {
+    grid-column: 2 / -1; display: inline-flex; align-items: center; gap: 8px; width: fit-content;
+    margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; user-select: none;
+    text-transform: none; letter-spacing: normal;
+}
+.direct-switch input {
+    appearance: none; -webkit-appearance: none; margin: 0; flex: none;
+    width: 34px; height: 20px; border-radius: 999px; background: #cfd8da; position: relative; cursor: pointer;
+    transition: background .15s;
+}
+.direct-switch input::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s;
+}
+.direct-switch input:checked { background: var(--brand); }
+.direct-switch input:checked::after { transform: translateX(14px); }
+.direct-switch input:focus-visible { outline: 3px solid rgba(13, 110, 110, .35); outline-offset: 2px; }
 .budget-item {
     display: grid;
     grid-template-columns: 36px 1fr auto;
