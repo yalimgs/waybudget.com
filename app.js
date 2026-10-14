@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTravelersInput();
     setupBudgetControls();
     updateRouteSummary();
+    document.getElementById('shareBtn').addEventListener('click', shareTrip);
+    openSharedTrip();
 });
 
 /* ---------------------------------------------------------------- Dates -- */
@@ -471,3 +473,112 @@ document.addEventListener('click', e => {
     window.open(url.href, '_blank', 'noopener');
 }, true);
 
+
+/* -------------------------------------------------------------- Sharing -- */
+/*
+ * A shared link carries the whole calculation:
+ *   ?from=IST&to=FCO&d=2026-11-10&r=2026-11-15&p=2
+ *   &c=economy.budget.standard.taxi.mixed   (flights.hotel.food.transfer.local)
+ *   &cur=TRY&lang=tr
+ * Opening it fills the form and calculates. If the departure date has passed,
+ * the dates are left empty and the visitor is asked for new ones; everything
+ * else stays as shared and can be changed.
+ */
+const SHARE_ITEMS = ['flights', 'hotel', 'food', 'transfer', 'local'];
+
+function shareUrl() {
+    const trip = currentTrip;
+    const u = new URL(location.origin + '/');
+    u.searchParams.set('from', trip.origin.a[0]);
+    u.searchParams.set('to', trip.destination.a[0]);
+    u.searchParams.set('d', trip.start);
+    u.searchParams.set('r', trip.end);
+    u.searchParams.set('p', String(trip.travelers));
+    u.searchParams.set('c', SHARE_ITEMS.map(k => choices[k]).join('.'));
+    u.searchParams.set('cur', displayCurrency);
+    u.searchParams.set('lang', LANG);
+    return u.toString();
+}
+
+async function shareTrip() {
+    if (!currentTrip) return;
+    const url = shareUrl();
+    const msg = document.getElementById('shareMsg');
+    const text = t('{a} → {b} trip budget: {total}', {
+        a: currentTrip.origin.n, b: currentTrip.destination.n,
+        total: document.getElementById('budgetTotal').textContent });
+    // Phones: the system share sheet (WhatsApp, Messages...). Elsewhere: copy the link.
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+        try { await navigator.share({ title: 'WayBudget', text, url }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    let copied = false;
+    try { await navigator.clipboard.writeText(url); copied = true; } catch (e) { /* not allowed */ }
+    if (!copied) {
+        const tmp = document.createElement('textarea');
+        tmp.value = url; tmp.setAttribute('readonly', ''); tmp.style.position = 'fixed'; tmp.style.opacity = '0';
+        document.body.appendChild(tmp); tmp.select();
+        try { copied = document.execCommand('copy'); } catch (e) { /* ignore */ }
+        tmp.remove();
+    }
+    msg.textContent = copied ? t('Link copied') : url;
+    msg.dataset.key = copied ? 'Link copied' : '';
+    clearTimeout(shareTrip.timer);
+    if (copied) shareTrip.timer = setTimeout(() => { msg.textContent = ''; msg.dataset.key = ''; }, 3000);
+}
+
+async function openSharedTrip() {
+    const q = new URLSearchParams(location.search);
+    if (!q.get('from') || !q.get('to')) return;
+    try { await citiesReady; } catch (e) { return; }
+    const find = code => allCities.find(c => c.a[0] === String(code).toUpperCase());
+    const origin = find(q.get('from')), destination = find(q.get('to'));
+    if (!origin || !destination) return;
+
+    // Language: the visitor's own choice wins; otherwise the sharer's
+    let ownLang = null;
+    try { ownLang = localStorage.getItem('wb-lang'); } catch (e) { /* storage blocked */ }
+    if (!ownLang && (q.get('lang') === 'tr' || q.get('lang') === 'en') && q.get('lang') !== LANG) {
+        LANG = q.get('lang');
+        applyStaticText();
+        document.dispatchEvent(new CustomEvent('lang:change'));
+    }
+
+    // Cities and travelers
+    for (const [type, city] of [['origin', origin], ['destination', destination]]) {
+        tripData[type] = city;
+        autocomplete[type].input.value = city.label;
+    }
+    els.passengers.value = String(clampTravelers(parseInt(q.get('p'), 10) || 1));
+
+    // Budget choices and currency (used for this view; not saved as the visitor's own)
+    const shared = (q.get('c') || '').split('.');
+    SHARE_ITEMS.forEach((k, i) => {
+        if ((BUDGET_MODEL.options[k] || []).some(([v]) => v === shared[i])) choices[k] = shared[i];
+    });
+    syncPresetTabs();
+    const cur = q.get('cur');
+    if (cur && document.querySelector(`#currency option[value="${cur}"]`)) {
+        displayCurrency = cur;
+        document.getElementById('currency').value = cur;
+    }
+
+    // Dates: only if still in the future and a valid stay
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    const d = q.get('d') || '', r = q.get('r') || '';
+    const datesOk = iso.test(d) && iso.test(r) && d >= toISODate(new Date()) && r > d &&
+                    nightsBetween(d, r) <= MAX_NIGHTS;
+    if (datesOk) {
+        els.startDate.value = d;
+        updateMinEndDate();
+        els.endDate.value = r;
+    }
+    history.replaceState(null, '', location.pathname);   // a reload starts fresh
+    updateRouteSummary();
+
+    if (datesOk) {
+        submitTrip({ preventDefault() {} });
+    } else {
+        showError('The dates in this link have passed. Please pick new dates.', ['startDate', 'endDate']);
+    }
+}
