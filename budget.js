@@ -157,7 +157,9 @@ function calculateBudget(trip, choices, live = {}) {
         return ' · ' + t('closest fare seen: {dates}', { dates: shortRange(dep, ret) });
     };
     const fl = live.flights && live.flights.found ? live.flights : null;
-    const via = !fl && live.flights && live.flights.via && live.flights.via.main ? live.flights.via : null;
+    const rawVia = !fl && live.flights && live.flights.via;
+    const via = rawVia && rawVia.main ? rawVia
+        : rawVia && rawVia.leg1 ? { hub: rawVia.hub, side: 'dest', main: rawVia.leg1, other: rawVia.leg2 } : null;
     // "only 1 fare found" / "2 fares found" / "14 fares found"
     const fareCount = n => n === 1 ? t('only 1 fare found') : t('{n} fares found', { n });
     if (fl) {
@@ -185,8 +187,9 @@ function calculateBudget(trip, choices, live = {}) {
         }
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `${route} · ${[info, fareCount(fl.fares)].filter(Boolean).join(' · ')} · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
+            detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares)].filter(Boolean).join(' · ')}` +
+                    ` · ${travelers} × ${money(perPerson)}`,
+            amount: roundMoney(perPerson) * travelers, kind, source, link: bookingLink(fl.book, travelers), linkLabel: 'See flights'
         });
     } else if (via) {
         // Two flights through a bigger airport: the long one has live fares,
@@ -208,7 +211,7 @@ function calculateBudget(trip, choices, live = {}) {
                     t(via.other ? 'no fares for this route, priced as 2 flights'
                                 : 'no fares for this route, live fare {a}–{b} + domestic flight estimate', { a, b }) +
                     ` · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind: 'estimate',
+            amount: roundMoney(perPerson) * travelers, kind: 'estimate',
             source: t('{a} ⇄ {b}: {n} fares seen recently (Aviasales)', { a, b, n: via.main.fares }),
             link: bookingLink(live.flights.book, travelers), linkLabel: 'See flights'
         });
@@ -221,7 +224,7 @@ function calculateBudget(trip, choices, live = {}) {
             detail: `${route} · ${Math.round(km).toLocaleString('en')} km` +
                     (live.loadingFlights ? '' : ' · ' + t('no fares found, check the live price')) +
                     ` · ${travelers} × ${money(perPerson)}`,
-            amount: perPerson * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
+            amount: roundMoney(perPerson) * travelers, kind: live.loadingFlights ? 'loading' : 'rough',
             source: t(live.loadingFlights ? 'Loading live fares' : 'Distance-based estimate (no live fare found)'),
             link: bookingLink(live.flights && live.flights.book, travelers), linkLabel: 'See flights'
         });
@@ -430,7 +433,7 @@ function fetchFlights(trip) {
     const via = viaHubs(trip.destination).join(','), viaFrom = viaHubs(trip.origin).join(',');
     return getJson(`/api/flights?origin=${trip.origin.a[0]}&destination=${trip.destination.a[0]}` +
                    `&depart=${trip.start}&return=${trip.end}${via ? `&via=${via}` : ''}` +
-                   `${viaFrom ? `&viaFrom=${viaFrom}` : ''}&v=9`);
+                   `${viaFrom ? `&viaFrom=${viaFrom}` : ''}&v=10`);
 }
 
 function fetchHotels(trip) {
@@ -456,6 +459,14 @@ function fxNoteText() {
             .toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' }) });
     }
     return `1 USD = ${rate.toLocaleString('en', { maximumFractionDigits: 4 })} ${displayCurrency}${when}`;
+}
+
+/* USD amount that shows as a round number in the display currency, so that
+   "2 × $160" really adds up to $320 */
+function roundMoney(usd) {
+    const rate = (priceData && priceData.fx[displayCurrency]) || 1;
+    const value = usd * rate;
+    return (value >= 100 ? Math.round(value / 5) * 5 : Math.round(value)) / rate;
 }
 
 function money(usd) {
