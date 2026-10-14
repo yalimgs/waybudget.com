@@ -193,7 +193,9 @@ function calculateBudget(trip, choices, live = {}) {
         }
         items.push({
             key: 'flights', label: 'Flights',
-            detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares), noDirectNote].filter(Boolean).join(' · ')}` +
+            detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares),
+                    choices.flights === 'premium' ? '' : seenNote(choices.flights === 'economy' ? fl.economy : fl.standard),
+                    noDirectNote].filter(Boolean).join(' · ')}` +
                     ` · ${travelers} × ${money(perPerson)}`,
             amount: roundMoney(perPerson) * travelers, kind, source, link: choices.flights === 'premium' ? bookingLink(fl.book, travelers, true)
                 : ticketLink(choices.flights === 'economy' ? fl.economy : fl.standard, fl.book, trip),
@@ -393,6 +395,22 @@ function ticketLink(fare, book, trip) {
     } catch (e) {
         return fallback;
     }
+}
+
+/* "seen today" / "seen yesterday" / "seen 3 days ago" from the fare's link
+   (search_date=DDMMYYYY), plus a reminder that the live price may differ */
+function seenNote(fare) {
+    if (!fare || !fare.link) return '';
+    let m;
+    try { m = /^(\d{2})(\d{2})(\d{4})$/.exec(new URL(fare.link).searchParams.get('search_date') || ''); }
+    catch (e) { return ''; }
+    if (!m) return '';
+    const seen = new Date(+m[3], +m[2] - 1, +m[1]);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const days = Math.round((now - seen) / 86400000);
+    if (days < 0 || days > 60) return '';
+    const when = days === 0 ? t('seen today') : days === 1 ? t('seen yesterday') : t('seen {n} days ago', { n: days });
+    return `${when}, ${t('live price may differ')}`;
 }
 
 function shortRange(depIso, retIso) {
