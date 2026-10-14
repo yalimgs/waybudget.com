@@ -195,7 +195,9 @@ function calculateBudget(trip, choices, live = {}) {
             key: 'flights', label: 'Flights',
             detail: `${route} · ${[info, choices.flights === 'premium' ? '' : fareCount(fl.fares), noDirectNote].filter(Boolean).join(' · ')}` +
                     ` · ${travelers} × ${money(perPerson)}`,
-            amount: roundMoney(perPerson) * travelers, kind, source, link: bookingLink(fl.book, travelers, choices.flights === 'premium'), linkLabel: 'See flights'
+            amount: roundMoney(perPerson) * travelers, kind, source, link: choices.flights === 'premium' ? bookingLink(fl.book, travelers, true)
+                : ticketLink(choices.flights === 'economy' ? fl.economy : fl.standard, fl.book, trip),
+            linkLabel: 'See flights'
         });
     } else if (via) {
         // Two flights through a bigger airport: the long one has live fares,
@@ -369,6 +371,28 @@ function bookingLink(book, travelers, premium = false) {
     const adults = Math.min(Math.max(travelers, 1), book.maxAdults || 9);
     // Aviasales: "c" before the passenger count searches business class
     return book.url.replace('{adults}', (premium && /aviasales/.test(book.url) ? 'c' : '') + adults);
+}
+
+/*
+ * Link that opens the exact ticket a price came from (Aviasales shows that
+ * ticket with its sellers; closing it shows the full list). Only when the
+ * ticket is for the dates asked; otherwise the normal search link.
+ */
+function ticketLink(fare, book, trip) {
+    const fallback = bookingLink(book, trip.travelers);
+    if (!fare || !fare.link || !fare.departureAt || !fare.returnAt || !fallback) return fallback;
+    if (fare.departureAt.slice(0, 10) !== trip.start || fare.returnAt.slice(0, 10) !== trip.end) return fallback;
+    try {
+        const u = new URL(fare.link);
+        if (!/^\/search\/[A-Z]{3}\d{4}[A-Z]{3}\d{4}\d$/.test(u.pathname)) return fallback;
+        const adults = Math.min(Math.max(trip.travelers, 1), book.maxAdults || 9);
+        u.pathname = u.pathname.slice(0, -1) + adults;            // last digit = passengers
+        const marker = new URL(fallback).searchParams.get('marker');
+        if (marker) u.searchParams.set('marker', marker);
+        return u.toString();
+    } catch (e) {
+        return fallback;
+    }
 }
 
 function shortRange(depIso, retIso) {
