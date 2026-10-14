@@ -639,6 +639,10 @@ input.invalid {
     padding: 10px 22px; border-radius: 10px; cursor: pointer;
 }
 .dp-done:hover { background: var(--brand-dark); }
+.dp-done.dp-ready { animation: dp-pop .35s ease-out; box-shadow: 0 0 0 4px rgba(13, 110, 110, .18); }
+@keyframes dp-pop { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.dp-grid button.dp-end:not(.dp-preview) { animation: dp-pop .3s ease-out; }
+@media (prefers-reduced-motion: reduce) { .dp-done.dp-ready, .dp-grid button.dp-end { animation: none; } }
 
 /* Phone: bottom sheet with scrolling months */
 .dp-panel.dp-mobile {

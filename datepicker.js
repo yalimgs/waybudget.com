@@ -67,8 +67,9 @@ const DatePicker = (() => {
         summary = root.querySelector('.dp-summary');
         live = root.querySelector('.dp-live');
 
-        root.querySelector('.dp-backdrop').addEventListener('click', () => close(false));
-        root.querySelector('.dp-close').addEventListener('click', () => close(false));
+        // Closing any way keeps what is selected (Done, ×, outside, Esc)
+        root.querySelector('.dp-backdrop').addEventListener('click', () => close(true));
+        root.querySelector('.dp-close').addEventListener('click', () => close(true));
         root.querySelector('.dp-done').addEventListener('click', () => close(true));
         root.querySelector('.dp-clear').addEventListener('click', () => {
             state.start = ''; state.end = ''; state.picking = 'start'; render(); focusDay(state.view);
@@ -147,8 +148,11 @@ const DatePicker = (() => {
             state.hover = '';
             render();
             announce(rangeText());
-            commit();
-            close(false);                          // nights are shown under the date fields
+            // Stay open so the choice can be seen (and changed): tapping another
+            // later day moves the return, an earlier one starts over; Done closes.
+            const done = root.querySelector('.dp-done');
+            done.classList.remove('dp-ready'); void done.offsetWidth; done.classList.add('dp-ready');
+            done.focus({ preventScroll: true });
         }
     }
 
@@ -217,7 +221,11 @@ const DatePicker = (() => {
         root.querySelector('.dp-next').setAttribute('aria-label', t('Next month'));
         root.querySelector('.dp-close').setAttribute('aria-label', t('Close'));
         root.querySelector('.dp-clear').textContent = t('Clear');
-        root.querySelector('.dp-done').textContent = t('Done');
+        // "Done · 5 nights" once both dates are picked
+        const doneBtn = root.querySelector('.dp-done');
+        doneBtn.textContent = state.start && state.end
+            ? `${t('Done')} · ${tn(nights(state.start, state.end), '{n} night', '{n} nights')}` : t('Done');
+        if (!state.end) doneBtn.classList.remove('dp-ready');
         panel.setAttribute('aria-label', t('Choose your travel dates'));
         summary.innerHTML = summaryHtml();
         paintRange();
@@ -285,7 +293,7 @@ const DatePicker = (() => {
     }
 
     function onKey(e) {
-        if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
+        if (e.key === 'Escape') { e.preventDefault(); close(true); return; }
         if (e.key === 'Tab') {       // keep focus inside the dialog
             const items = [...panel.querySelectorAll('button:not([disabled])')]
                 .filter(b => b.tabIndex >= 0 && b.offsetParent !== null);
