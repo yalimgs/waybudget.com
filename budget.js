@@ -437,7 +437,7 @@ function fetchHotels(trip) {
     return getJson(`/api/hotels?lat=${trip.destination.lat}&lon=${trip.destination.lon}` +
                    `&checkin=${trip.start}&checkout=${trip.end}&adults=${Math.min(2, trip.travelers)}&travelers=${trip.travelers}` +
                    `&city=${encodeURIComponent(trip.destination.n.replace(/ \(.*\)$/, ''))}` +
-                   `&country=${encodeURIComponent(trip.destination.c)}&v=8`);
+                   `&country=${encodeURIComponent(trip.destination.c)}&v=10`);
 }
 
 /* ------------------------------------------------------------- Currency -- */
