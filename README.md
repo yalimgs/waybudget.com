@@ -1,66 +1,76 @@
 # WayBudget
 
-Route budget planner: estimate the full cost of a trip (flights, accommodation,
-food, local transfers, attractions) from origin, destination, dates and travelers.
+**How much will your trip really cost?** WayBudget gives one door-to-door total for a trip:
+flights, hotel, food, airport transfers and local transport.
 
-Live: https://waybudget.com (Cloudflare, auto-deploys on push to `main`)
+Live: **https://waybudget.com** · English and Turkish · USD, EUR, GBP, TRY
 
-## Structure
+_Last updated: 27 October 2026_
 
-| File | Purpose |
+## What it does
+
+- Pick from, to, dates and travelers. You get a total and a per-person price.
+- Each item has its own level: Budget, Standard or Luxury, or None to leave it out.
+- Live flight and hotel prices, each with a link to that exact ticket or hotel list.
+- "Only direct flights" switch.
+- Shows how many prices were found, and when the fare was seen.
+- **Share this budget**: a link that reopens the same calculation. Expired dates ask for new ones.
+- Remembers language, currency and choices on the visitor's device.
+- Custom date-range calendar that works the same on phone and desktop.
+
+## Where the numbers come from
+
+| Item | Source | Notes |
+|---|---|---|
+| Flights | Travelpayouts / Aviasales Data API | Fares seen in recent searches. Economy is the cheapest; Standard is the median, preferring direct flights. Premium is business class when seen. Small airports with no fares are priced through a nearby hub. |
+| Hotels | LiteAPI live rates | Hotels within 6 km of the centre, widened to 20 km if few are found. Budget, Standard and Luxury tiers are picked from the results. |
+| Food | World Bank ICP restaurant price levels | Brought forward monthly with Eurostat, World Bank and BLS indexes. |
+| Transfers and local transport | Road distance (OpenStreetMap) × local taxi and transit prices | Uses the country's price level. |
+| Exchange rates | fawazahmed0 currency-api (free, daily) | Through `/api/fx`, cached for 1 hour |
+
+Every line is labelled **Live** (real price), **Estimate** (model) or **Approx.** (fallback).
+
+## Tech
+
+- Plain HTML, CSS and JavaScript. No framework, no build step.
+- **Cloudflare Pages** hosts the site. **Pages Functions** (`functions/api`) call the price APIs and cache results at the edge.
+- **GitHub Actions** refreshes price and inflation data every Monday, with a retry on Tuesday.
+- API keys live only in Cloudflare environment variables (`TRAVELPAYOUTS_TOKEN`, `LITEAPI_KEY`). None are in the code.
+
+## Files
+
+| Path | Purpose |
 |---|---|
-| `index.html` | Page markup |
-| `style.css` | Styling (responsive) |
-| `search.js` | City/airport autocomplete (keyboard + mouse) |
-| `app.js` | Dates, travelers, validation, trip summary, budget rendering |
-| `budget.js` | Budget model: base costs, price-level scaling, currency display |
-| `data/prices.json` | Price level per country (USA = 1.0) + exchange rates for display |
-| `data/cities.json` | ~3,000 cities that have a scheduled-service airport, with IATA codes and coordinates |
-| `tools/build_cities.py` | Rebuilds `data/cities.json` |
-| `tools/refresh_prices.py` | Refreshes `data/prices.json` (price levels, fallback FX, US inflation factor) |
-| `tools/dump_geonames.js` | Exports GeoNames cities for `build_cities.py` |
-| `.github/workflows/refresh-data.yml` | Runs both refreshes every Monday (retry Tuesday if Monday failed) |
+| `index.html`, `style.css` | Page and styling |
+| `app.js` | Form, validation, results, sharing, saved preferences |
+| `budget.js` | Budget model and price API calls |
+| `search.js` | City and airport autocomplete |
+| `datepicker.js` | Range calendar |
+| `i18n.js` | English and Turkish text |
+| `functions/api/` | `flights.js`, `hotels.js`, `fx.js` (server side) |
+| `data/` | `cities.json` (3,082 cities with airports), `prices.json`, `roads.json` |
+| `tools/` | Scripts that rebuild the data files |
 
-## How the budget is estimated
+## Run locally
 
-All base costs in `BUDGET_MODEL` (top of `budget.js`) are typical US prices in USD.
-They are scaled to the destination by its price level (World Bank PPP / market
-exchange rate), softened with an exponent because tourist prices vary less than
-general prices. Labels in the UI: **Live** (real price from an API), **Estimate**
-(price-level model), **Rough** (placeholder until a live API is connected —
-currently flights and hotels).
-
-Plain HTML/CSS/JS, no build step. To run locally: `python -m http.server` in this
-folder, then open http://localhost:8000 (opening `index.html` directly won't load the JSON).
-
-## Deploying
-
-Push to `main`; Cloudflare Pages deploys automatically (`functions/` becomes the API).
-Before committing CSS/JS changes run `python3 tools/bump_version.py` — it stamps
-`?v=<hash>` on the CSS/JS links in `index.html` so browsers fetch the new files
-instead of serving cached copies (Cloudflare lets browsers cache CSS/JS for 4 hours).
-
-## Data freshness
-
-| Data | Refreshed |
-|---|---|
-| Exchange rates (display) | Hourly check via `/api/fx` (source updates daily) |
-| Flight prices | Live, edge-cached 6 h |
-| Hotel prices | Live, edge-cached 1 h |
-| Country price levels, fallback FX, base-cost inflation | Weekly, Mondays (GitHub Actions) |
-| Airport / city list | Weekly, Mondays (GitHub Actions) |
-
-Run the weekly refresh by hand: GitHub → Actions → "Refresh data" → Run workflow.
-
-## Rebuilding the city data
-
-```
-git clone --depth 1 https://github.com/davidmegginson/ourairports-data
-# GeoNames cities dumped from the `all-the-cities` npm package as
-# [[name, countryCode, population, lat, lon, altName], ...]
-python3 tools/build_cities.py ourairports-data cities.json data/cities.json
+```bash
+python3 -m http.server
 ```
 
-Manual city-name fixes and search keywords live in `OVERRIDES` / `ALIASES` at the top of the script.
+Open http://localhost:8000. The page works offline from the data files.
+Live flight and hotel prices need Cloudflare (`npx wrangler pages dev .` with the two keys set).
 
-Data: [OurAirports](https://ourairports.com/) (public domain), [GeoNames](https://www.geonames.org/) (CC BY 4.0).
+## Deploy
+
+Push to `main` and Cloudflare deploys automatically.
+Before committing CSS or JS changes, run `python3 tools/bump_version.py`. It adds a version to the file links so visitors get the new files.
+
+## Roadmap
+
+- Destination pages, such as `/destinations/rome`, with typical costs and the cheapest dates
+- Type your trip in plain words (AI)
+- Plan a trip together in real time
+
+---
+
+© 2026 Yalım Özçağlayan. All rights reserved.
