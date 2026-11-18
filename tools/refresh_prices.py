@@ -28,7 +28,7 @@ kept and the run still succeeds. Sources are free and need no API key.
 
 Usage: python3 tools/refresh_prices.py data/prices.json
 """
-import datetime, json, os, sys, urllib.request
+import datetime, json, os, sys, time, urllib.error, urllib.request
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'data/prices.json'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,10 +68,21 @@ ICP = ('https://api.worldbank.org/v2/sources/{src}/country/all/series/1111000;10
        '/classification/PX.WL/time/YR{year}?format=json&per_page=2000')
 
 
-def get(url, timeout=60):
+def get(url, timeout=60, tries=3):
+    """Fetch a URL; retry server errors and timeouts (the World Bank API is
+    sometimes briefly down) after 15 s, then 60 s."""
     req = urllib.request.Request(url, headers={'User-Agent': 'waybudget-data-refresh'})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode('utf-8')
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode('utf-8')
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == tries - 1:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == tries - 1:
+                raise
+        time.sleep((15, 60)[min(attempt, 1)])
 
 
 def log(msg):
@@ -271,6 +282,7 @@ def main():
                 levels.setdefault(cc, levels[parent])
         out['level'] = dict(sorted(levels.items()))
         out['levelBasis'] = f'World Bank PPP {max(ppp_years)} + CPI, FX {fx_date}'
+        out['levelsUpdated'] = today
         notes.append(f'levels {len(levels)} countries ({out["levelBasis"]})')
     except Exception as e:
         notes.append(f'levels kept ({e!r})'[:300])
@@ -388,7 +400,17 @@ def main():
     log('prices.json: ' + '; '.join(notes))
     # Non-zero exit if any part had to keep old values, so the workflow can
     # retry the next day (the parts that did succeed are already saved).
-    if any('kept' in n for n in notes):
+    # Country price levels come from yearly data, so keeping last week's is
+    # fine; only fail for them once they are more than 45 days old.
+    def stale(n):
+        if not n.startswith('levels kept'):
+            return True
+        # last successful levels run: levelsUpdated, or the FX date in levelBasis
+        import re
+        m = re.search(r'\d{4}-\d{2}-\d{2}', out.get('levelBasis', ''))
+        last = out.get('levelsUpdated') or (m.group(0) if m else '2000-01-01')
+        return (datetime.date.fromisoformat(today) - datetime.date.fromisoformat(last)).days > 45
+    if any('kept' in n and stale(n) for n in notes):
         sys.exit(1)
 
 

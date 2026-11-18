@@ -34,7 +34,7 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.when.outputs.run == 'yes'
 
       - name: Refresh prices (price levels, fallback FX, US inflation)
